@@ -59,7 +59,7 @@ export default async function Home() {
       </dl>
 
       <p className="text-xs text-neutral-400">
-        Phase 0 scaffold · the plan view arrives in Phase 2
+        capture · triage · plan your day — auto-scheduling arrives in Phase 3
       </p>
     </main>
   );

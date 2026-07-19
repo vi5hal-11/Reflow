@@ -2,6 +2,17 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-19 — Phase 2 (manual day + Daily Big 3)
+
+- **No new migration**: every Phase 2 column (`scheduled_start/end`, `is_big3`, `daily_plans`) already existed in 0001; `planned_date` came in 0003.
+- **Skip semantics (pre-Phase-5)**: a placed block can be **unplaced** (back to today's tray) and a tray task moved to **later** (clears `planned_date` and Big 3 membership). No `rolled` status or roll-forward yet — that's Phase 5's soft roll; nothing today shows as overdue.
+- **Big 3 persisted in two places** by design: `tasks.is_big3` (per-task flag the Phase 3 scheduler ranks on) and `daily_plans.big3_task_ids` (the day's ordered record), upserted on `(user_id, plan_date)`. The client keeps them in sync on every toggle/later action.
+- **Day math is browser-local** (consistent with Phase 1's `localToday()` triage writes). The server page only bounds its fetch with a ±36h window and the client trims to its exact local day. **Self-healing timezone**: `/today` silently updates `profiles.timezone` to the browser's IANA zone when they differ, so server rendering and the Phase 3 scheduler converge on the right zone.
+- **Manual placement rules**: duration = `estimated_minutes` (default 30m; fixed tasks default 60m); placement lands at the gap start clamped to *now*, rounded up to 5 minutes; gaps under 10 minutes aren't offered. Buffers are *not* enforced on manual placement — they're the auto-scheduler's job (§5), and overriding a human's explicit choice would be friction.
+- **`middleware.ts` → `proxy.ts`**: Next 16 deprecated the middleware file convention; renamed per the bundled docs (same behavior, named `proxy` export).
+- **Local dev env**: created `apps/web/.env.local` on the founder's machine (publishable Supabase values only — client-safe by design; RLS is the boundary). Not committed (gitignored).
+- **Verification**: tsc + ESLint clean (new `react-hooks/purity` rule respected), production build green, route guard smoke-tested (`/today` → 307 `/login` signed out), and the day view's PostgREST `or=` filter validated against the live API (parses, RLS returns zero rows to anon). Signed-in browser pass still pending a real magic-link session — same limitation logged in Phase 1.
+
 ## 2026-07-19 — Phase 1 (capture & inbox)
 
 - **Schema additions (migration 0003)**: `tasks.raw_text` (the capture exactly as typed — never lost), `tasks.parse_suggestions` (full §6 contract stored as jsonb so triage can show/override), `tasks.parsed_at`, and `tasks.planned_date` (what "Today/Later" triage sets; Phase 2's day view reads it). `planned_date` is intentionally distinct from `deadline`.

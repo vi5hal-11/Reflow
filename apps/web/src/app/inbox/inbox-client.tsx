@@ -192,6 +192,9 @@ export function InboxClient({
           <span>
             {todayCount} for today · {laterCount} for later
           </span>
+          <Link href="/today" className="underline underline-offset-4">
+            today
+          </Link>
           <form action={signOut}>
             <button className="underline underline-offset-4">sign out</button>
           </form>
