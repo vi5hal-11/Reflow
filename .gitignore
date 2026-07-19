@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# builds
+.next/
+out/
+dist/
+*.egg-info/
+
+# env — secrets never committed
+.env
+.env.local
+.env*.local
+
+# misc
+.DS_Store
+*.pem
+.pytest_cache/
+.ruff_cache/
+*.tsbuildinfo
