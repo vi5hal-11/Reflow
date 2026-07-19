@@ -7,7 +7,7 @@ Owns exactly two responsibilities (CLAUDE.md §3):
 
 from fastapi import FastAPI, HTTPException
 
-from .engine.intervals import free_intervals
+from .engine.schedule import plan
 from .llm import parse as llm_parse
 from .models import ScheduleRequest, ScheduleResponse
 
@@ -21,17 +21,9 @@ def health() -> dict[str, str]:
 
 @app.post("/schedule", response_model=ScheduleResponse)
 def schedule(req: ScheduleRequest) -> ScheduleResponse:
-    """Phase 0 stub: computes free intervals to prove the pipeline; greedy
-    energy-aware placement lands in Phase 3."""
-    window_start = max(req.now, req.working_window_start)
-    free = free_intervals(
-        (window_start, req.working_window_end),
-        [(b.start, b.end) for b in req.fixed_blocks],
-        req.default_buffer_minutes,
-    )
-    # No placement yet: every flexible task is overflow until Phase 3.
-    _ = free
-    return ScheduleResponse(placed=[], overflow=[t.id for t in req.flexible_tasks])
+    """Deterministic re-flow (CLAUDE.md §5): pure, fast, no LLM in the hot
+    path. Overflow is an outcome, not an error."""
+    return plan(req)
 
 
 @app.post("/parse", response_model=llm_parse.ParseResponse)

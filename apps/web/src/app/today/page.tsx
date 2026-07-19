@@ -35,7 +35,9 @@ export default async function TodayPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("timezone, working_hours_start, working_hours_end, default_buffer_minutes")
+    .select(
+      "timezone, working_hours_start, working_hours_end, default_buffer_minutes, energy_profile",
+    )
     .eq("id", user.id)
     .single();
 
@@ -76,6 +78,7 @@ export default async function TodayPage() {
     working_hours_start: "09:00:00",
     working_hours_end: "18:00:00",
     default_buffer_minutes: 10,
+    energy_profile: null,
   };
 
   return (

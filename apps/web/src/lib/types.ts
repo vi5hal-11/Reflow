@@ -63,9 +63,23 @@ export type DayCalendarEvent = {
   is_busy: boolean;
 };
 
+// jsonb clock-string ranges per energy tag, e.g. {"deep":["09:00-12:00"]}.
+// The client resolves these against its local day before calling /api/plan.
+export type EnergyProfile = Partial<Record<EnergyTag, string[]>>;
+
 export type DayProfile = {
   timezone: string;
   working_hours_start: string; // "HH:MM:SS"
   working_hours_end: string;
   default_buffer_minutes: number;
+  energy_profile: EnergyProfile | null;
+};
+
+// What /api/plan returns on success (Phase 3 — auto-schedule + re-flow).
+export type PlanWildcard = { start: string; end: string };
+
+export type PlanResponse = {
+  tasks: DayTask[];
+  wildcards: PlanWildcard[];
+  overflow: string[];
 };

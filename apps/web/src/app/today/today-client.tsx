@@ -1,19 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import type { DayCalendarEvent, DayProfile, DayTask } from "@/lib/types";
+import {
+  energyTags,
+  type DayCalendarEvent,
+  type DayProfile,
+  type DayTask,
+  type PlanResponse,
+  type PlanWildcard,
+} from "@/lib/types";
 
 const PX_PER_MIN = 1.1;
 const MIN_GAP_MINUTES = 10;
 const DEFAULT_TASK_MINUTES = 30;
 const DEFAULT_FIXED_MINUTES = 60;
 
-function localToday(): string {
-  const d = new Date();
+function fmtDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function localToday(): string {
+  return fmtDate(new Date());
+}
+
+function localTomorrow(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return fmtDate(d);
 }
 
 /** Minutes since local midnight for an ISO timestamp. */
@@ -93,6 +109,13 @@ export function TodayClient({
   const [big3Ids, setBig3Ids] = useState<string[]>(initialBig3Ids);
   const [placingId, setPlacingId] = useState<string | null>(null);
   const [now, setNow] = useState(nowMinutes);
+  const [wildcards, setWildcards] = useState<PlanWildcard[]>([]);
+  const [overflowIds, setOverflowIds] = useState<Set<string>>(new Set());
+  const [planning, setPlanning] = useState(false);
+  const [planNotice, setPlanNotice] = useState<string | null>(null);
+  // Auto re-flow only after the user has planned once, at most once a minute.
+  const hasPlannedRef = useRef(false);
+  const lastReflowRef = useRef(0);
 
   useEffect(() => {
     const t = setInterval(() => setNow(nowMinutes()), 30_000);
@@ -115,6 +138,85 @@ export function TodayClient({
 
   const dayStart = parseClock(profile.working_hours_start);
   const dayEnd = Math.max(parseClock(profile.working_hours_end), dayStart + 60);
+
+  // "Plan my day" + silent self-healing re-flow (§5). The deterministic
+  // scheduler service does the placement; this only ships it the local-day
+  // window and merges the outcome. Failures never block manual placement.
+  const energyProfileJson = JSON.stringify(profile.energy_profile ?? {});
+  const planDay = useCallback(
+    async (auto: boolean) => {
+      if (auto) {
+        if (!hasPlannedRef.current) return;
+        if (Date.now() - lastReflowRef.current < 60_000) return;
+      }
+      lastReflowRef.current = Date.now();
+      setPlanning(true);
+      if (!auto) setPlanNotice(null);
+      try {
+        const energyProfile = JSON.parse(energyProfileJson) as Partial<
+          Record<string, string[]>
+        >;
+        const energyWindows = energyTags.flatMap((tag) =>
+          (energyProfile[tag] ?? []).flatMap((range) => {
+            const [from, to] = range.split("-");
+            if (!from || !to) return [];
+            return [
+              {
+                tag,
+                start: minutesToIso(parseClock(from)),
+                end: minutesToIso(parseClock(to)),
+              },
+            ];
+          }),
+        );
+        const res = await fetch("/api/plan", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            date: localToday(),
+            workingWindowStart: minutesToIso(dayStart),
+            workingWindowEnd: minutesToIso(dayEnd),
+            energyWindows,
+          }),
+        });
+        if (!res.ok) {
+          if (!auto)
+            setPlanNotice(
+              "The planner isn't reachable right now — placing by hand works as always.",
+            );
+          return;
+        }
+        const data = (await res.json()) as PlanResponse;
+        hasPlannedRef.current = true;
+        setTasks((prev) => {
+          const updated = new Map(data.tasks.map((t) => [t.id, t]));
+          const merged = prev.map((t) => updated.get(t.id) ?? t);
+          const known = new Set(prev.map((t) => t.id));
+          for (const t of data.tasks) if (!known.has(t.id)) merged.push(t);
+          return merged;
+        });
+        setWildcards(data.wildcards);
+        setOverflowIds(new Set(data.overflow));
+        setPlacingId(null);
+      } catch {
+        if (!auto)
+          setPlanNotice(
+            "The planner isn't reachable right now — placing by hand works as always.",
+          );
+      } finally {
+        setPlanning(false);
+      }
+    },
+    [dayStart, dayEnd, energyProfileJson],
+  );
+
+  // Re-flow when the day changes shape: completions, edits, returning to
+  // the tab. Throttled and silent — the plan heals without ceremony.
+  useEffect(() => {
+    const onFocus = () => void planDay(true);
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [planDay]);
 
   const fixedBlocks = useMemo(() => {
     const taskBlocks = tasks
@@ -221,8 +323,9 @@ export function TodayClient({
           scheduled_start: null,
           scheduled_end: null,
         });
+      else void planDay(true);
     },
-    [supabase, patchTask],
+    [supabase, patchTask, planDay],
   );
 
   const unschedule = useCallback(
@@ -256,8 +359,9 @@ export function TodayClient({
         .update({ status: nextStatus })
         .eq("id", task.id);
       if (error) patchTask(task.id, { status: task.status });
+      else void planDay(true);
     },
-    [supabase, patchTask],
+    [supabase, patchTask, planDay],
   );
 
   const moveToLater = useCallback(
@@ -269,6 +373,38 @@ export function TodayClient({
       const { error: taskError } = await supabase
         .from("tasks")
         .update({ planned_date: null, is_big3: false })
+        .eq("id", task.id);
+      const { error: planError } =
+        nextIds.length !== big3Ids.length
+          ? await supabase
+              .from("daily_plans")
+              .upsert(
+                { user_id: userId, plan_date: today, big3_task_ids: nextIds },
+                { onConflict: "user_id,plan_date" },
+              )
+          : { error: null };
+      if (taskError || planError) {
+        patchTask(task.id, prev);
+        setBig3Ids(big3Ids);
+      }
+    },
+    [supabase, patchTask, big3Ids, userId, today],
+  );
+
+  const moveToTomorrow = useCallback(
+    async (task: DayTask) => {
+      const prev = { ...task };
+      const nextIds = big3Ids.filter((id) => id !== task.id);
+      patchTask(task.id, { planned_date: localTomorrow() });
+      setOverflowIds((ids) => {
+        const next = new Set(ids);
+        next.delete(task.id);
+        return next;
+      });
+      setBig3Ids(nextIds);
+      const { error: taskError } = await supabase
+        .from("tasks")
+        .update({ planned_date: localTomorrow(), is_big3: false })
         .eq("id", task.id);
       const { error: planError } =
         nextIds.length !== big3Ids.length
@@ -365,8 +501,21 @@ export function TodayClient({
           <Link href="/inbox" className="underline underline-offset-4 hover:text-neutral-600">
             Inbox
           </Link>
+          <button
+            onClick={() => void planDay(false)}
+            disabled={planning}
+            className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-60 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+          >
+            {planning ? "re-flowing…" : "Plan my day"}
+          </button>
         </nav>
       </header>
+
+      {planNotice && (
+        <p className="rounded-lg border border-neutral-200 px-4 py-2 text-sm text-neutral-500 dark:border-neutral-800">
+          {planNotice}
+        </p>
+      )}
 
       {/* Daily Big 3 — the day's definition of a win */}
       <section aria-label="Daily Big 3" className="space-y-2">
@@ -457,6 +606,30 @@ export function TodayClient({
                 </div>
               );
             })}
+
+            {/* Wildcard blocks — reserved breathing room (§5.6). Click-through
+                so a gap underneath stays manually placeable: the human wins. */}
+            {wildcards
+              .filter((w) => isLocalToday(w.start))
+              .map((w) => {
+                const start = toMinutes(w.start);
+                const end = toMinutes(w.end);
+                return (
+                  <div
+                    key={`wc-${w.start}`}
+                    aria-hidden
+                    className="pointer-events-none absolute left-14 right-0 overflow-hidden rounded-md border border-dashed border-amber-300/70 bg-amber-50/40 px-3 py-1 dark:border-amber-700/40 dark:bg-amber-950/20"
+                    style={{
+                      top: `${y(Math.max(start, dayStart))}px`,
+                      height: `${Math.max((Math.min(end, dayEnd) - Math.max(start, dayStart)) * PX_PER_MIN, 20)}px`,
+                    }}
+                  >
+                    <p className="truncate text-[11px] text-amber-600/80 dark:text-amber-400/70">
+                      wildcard · breathing room
+                    </p>
+                  </div>
+                );
+              })}
 
             {/* Fixed blocks — immovable */}
             {fixedBlocks.map((b) => (
@@ -574,6 +747,11 @@ export function TodayClient({
                     <span className="min-w-0 flex-1 truncate">{t.title}</span>
                     {star(t)}
                   </div>
+                  {overflowIds.has(t.id) && (
+                    <p className="mt-1 text-[11px] text-neutral-400">
+                      didn&apos;t fit today — it can wait, no harm done
+                    </p>
+                  )}
                   <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-neutral-400">
                     <span>{t.estimated_minutes ?? DEFAULT_TASK_MINUTES}m</span>
                     {t.energy_tag && <span>· {t.energy_tag}</span>}
@@ -602,6 +780,15 @@ export function TodayClient({
                       >
                         later
                       </button>
+                      {overflowIds.has(t.id) && (
+                        <button
+                          onClick={() => void moveToTomorrow(t)}
+                          title="Roll to tomorrow — it'll be first in line"
+                          className="rounded border border-neutral-300 px-1.5 py-0.5 text-neutral-400 hover:border-neutral-500 dark:border-neutral-600"
+                        >
+                          tomorrow
+                        </button>
+                      )}
                     </span>
                   </div>
                 </li>
@@ -643,7 +830,7 @@ export function TodayClient({
       </div>
 
       <p className="mt-auto pt-6 text-center text-xs text-neutral-300 dark:text-neutral-600">
-        auto-planning arrives in Phase 3 — for now, place tasks by hand
+        plan my day re-flows around what&apos;s fixed · placing by hand always works
       </p>
     </main>
   );

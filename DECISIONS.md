@@ -2,6 +2,17 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-19 — Phase 3 (deterministic auto-scheduler + self-heal)
+
+- **Contract refinement**: the engine takes `energy_windows` as concrete datetime ranges (resolved by the web client against its local day) instead of §5's clock-string `energy_profile` — the engine stays timezone-agnostic and purely interval-based. `FlexibleTask` carries `scheduled_start/end` (for stable re-flow) and `created_at` (FIFO tiebreak); `PlacedBlock.kept` tells the client which blocks didn't move.
+- **Energy semantics**: a task *starts* inside a matching energy window even if it spills past the window's end (start deep work in deep hours), preferring the earliest energy-matched start; falls back to earliest fit. Deliberate: anchoring the start matters more than containment.
+- **Stability semantics**: an existing placement is kept verbatim iff it lies within the remaining window (or is *in progress* — started, not yet ended, at `now`) and conflicts with nothing. A block missed entirely (ended before `now`) is rescheduled — that's the self-heal. Kept blocks win by earlier `scheduled_start` (then id) when they conflict with each other.
+- **Wildcard strategy**: reserved at the *end of the day* (latest fitting free space), after Big 3 placement but before everything else — Big 3 outrank wildcards, wildcards outrank the rest. Wildcards are ephemeral (returned per plan, rendered, not persisted — no schema for them until a real need appears) and rendered click-through so manual placement can override breathing room.
+- **Self-heal triggers (web)**: re-flow fires after complete/undo and manual place, and on tab focus — but only once the user has planned at least once this session, throttled to one auto re-flow per 60s, and always silent on failure. **Unplace deliberately does NOT trigger a re-flow**: the engine would immediately re-place the task (deterministically, likely in the same spot), fighting the user's explicit choice.
+- **Ranking**: `(not is_big3, deadline is None, deadline, priority, created_at is None, created_at, id)` — id as the final tiebreak makes every sort fully deterministic.
+- **Measured perf**: 0.47ms warm re-flow for 50 tasks + 8 fixed blocks (target <50ms, §5). 41 tests green: unit + nasty cases, hypothesis property tests (invariants ×200 examples, determinism, stability round-trip), perf guard at 200ms to stay CI-unflaky.
+- **Parallel-agent build note**: Phase 3 was attempted as a two-stream agent workflow (engine ∥ web); the agents hit the session usage limit mid-build. The web agent's finished `/api/plan` route + types survived and were kept; the engine, tests, and `/today` integration were completed inline. The adversarial-verify pass planned for the workflow was folded into the property-test suite instead.
+
 ## 2026-07-19 — Phase 2 (manual day + Daily Big 3)
 
 - **No new migration**: every Phase 2 column (`scheduled_start/end`, `is_big3`, `daily_plans`) already existed in 0001; `planned_date` came in 0003.
