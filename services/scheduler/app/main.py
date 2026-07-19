@@ -8,6 +8,7 @@ Owns exactly two responsibilities (CLAUDE.md §3):
 from fastapi import FastAPI, HTTPException
 
 from .engine.intervals import free_intervals
+from .llm import parse as llm_parse
 from .models import ScheduleRequest, ScheduleResponse
 
 app = FastAPI(title="Reflow Scheduler", version="0.1.0")
@@ -33,9 +34,14 @@ def schedule(req: ScheduleRequest) -> ScheduleResponse:
     return ScheduleResponse(placed=[], overflow=[t.id for t in req.flexible_tasks])
 
 
-@app.post("/parse")
-def parse() -> None:
-    raise HTTPException(status_code=501, detail="Arrives in Phase 1 (LLM capture enrichment)")
+@app.post("/parse", response_model=llm_parse.ParseResponse)
+def parse(req: llm_parse.ParseRequest) -> llm_parse.ParseResponse:
+    """Enrich a raw capture into a structured task suggestion. Never blocks
+    capture: callers treat 503 (unconfigured) and `source: "fallback"` as
+    "keep the raw text"."""
+    if not llm_parse.is_configured():
+        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
+    return llm_parse.parse_capture(req)
 
 
 @app.post("/reflect")

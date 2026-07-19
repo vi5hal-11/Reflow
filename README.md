@@ -45,4 +45,8 @@ Email magic-link sign-in works out of the box. Google OAuth requires adding OAut
 
 ## Build phases
 
-Phase 0 (this scaffold) → capture & inbox → manual day + Big 3 → deterministic auto-scheduler + self-heal → Google Calendar sync → no-guilt polish → voice, reflection, monetization. Full roadmap in [CLAUDE.md §9](CLAUDE.md).
+**Done:** Phase 0 (scaffold) · Phase 1 (capture & inbox — omnibox with optimistic capture, background `/parse` enrichment via Anthropic structured outputs, keyboard triage: `t` today / `l` later / `x` drop).
+
+**Next:** manual day + Daily Big 3 → deterministic auto-scheduler + self-heal → Google Calendar sync → no-guilt polish → voice, reflection, monetization. Full roadmap in [CLAUDE.md §9](CLAUDE.md).
+
+To enable live parse enrichment, set `ANTHROPIC_API_KEY` (and optionally `PARSE_MODEL`) in the scheduler service environment. Without it the app still works — captures simply stay as typed.

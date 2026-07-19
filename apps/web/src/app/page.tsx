@@ -1,6 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { signOut } from "./login/actions";
 
 async function schedulerStatus(): Promise<"up" | "down"> {
   const base = process.env.SCHEDULER_URL;
@@ -21,6 +21,7 @@ export default async function Home() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (user) redirect("/inbox");
   const scheduler = await schedulerStatus();
 
   return (
@@ -34,21 +35,12 @@ export default async function Home() {
       </div>
 
       <div className="flex items-center gap-3 text-sm">
-        {user ? (
-          <>
-            <span className="text-neutral-500">Signed in as {user.email}</span>
-            <form action={signOut}>
-              <button className="underline underline-offset-4">Sign out</button>
-            </form>
-          </>
-        ) : (
-          <Link
-            href="/login"
-            className="rounded-md bg-neutral-900 px-4 py-2 font-medium text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-          >
-            Sign in
-          </Link>
-        )}
+        <Link
+          href="/login"
+          className="rounded-md bg-neutral-900 px-4 py-2 font-medium text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+        >
+          Sign in
+        </Link>
       </div>
 
       <dl className="grid max-w-md grid-cols-2 gap-4 text-sm text-neutral-500">
