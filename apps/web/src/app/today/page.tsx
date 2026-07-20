@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCalendarStatus } from "@/lib/calendar/status";
 import {
   dayTaskColumns,
   type DayCalendarEvent,
@@ -48,7 +49,8 @@ export default async function TodayPage() {
   const windowStart = new Date(nowMs - 36 * 60 * 60 * 1000).toISOString();
   const windowEnd = new Date(nowMs + 36 * 60 * 60 * 1000).toISOString();
 
-  const [{ data: tasks }, { data: events }, { data: plan }] = await Promise.all([
+  const [{ data: tasks }, { data: events }, { data: plan }, calendarStatus] =
+    await Promise.all([
     supabase
       .from("tasks")
       .select(dayTaskColumns)
@@ -71,6 +73,7 @@ export default async function TodayPage() {
       .select("id, plan_date, big3_task_ids")
       .eq("plan_date", today)
       .maybeSingle(),
+    getCalendarStatus(user.id),
   ]);
 
   const fallbackProfile: DayProfile = {
@@ -88,6 +91,7 @@ export default async function TodayPage() {
       initialTasks={(tasks ?? []) as DayTask[]}
       calendarEvents={(events ?? []) as DayCalendarEvent[]}
       initialBig3Ids={(plan?.big3_task_ids as string[] | null) ?? []}
+      calendarStatus={calendarStatus}
     />
   );
 }

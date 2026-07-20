@@ -1,6 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { calendarAvailable } from "@/lib/calendar/status";
+import { deleteEvent, insertEvent, patchEvent } from "@/lib/calendar/google";
+import { getAccessToken, getConnection } from "@/app/api/calendar/connection";
 import {
   dayTaskColumns,
   energyTags,
@@ -45,7 +49,7 @@ const scheduleResponseSchema = z.object({
   overflow: z.array(z.string()),
 });
 
-type PlanTask = DayTask & { created_at: string };
+type PlanTask = DayTask & { created_at: string; google_event_id: string | null };
 
 function addMinutes(iso: string, minutes: number): string {
   return new Date(new Date(iso).getTime() + minutes * 60_000).toISOString();
@@ -91,7 +95,7 @@ export async function POST(request: Request) {
         .single(),
       supabase
         .from("tasks")
-        .select(`${dayTaskColumns}, created_at`)
+        .select(`${dayTaskColumns}, created_at, google_event_id`)
         .neq("status", "inbox")
         .or(
           [
@@ -174,6 +178,19 @@ export async function POST(request: Request) {
   const byId = new Map(tasks.map((t) => [t.id, t]));
   const updates: { id: string; patch: Partial<DayTask> }[] = [];
 
+  // Bidirectional push (Phase 4): blocks to mirror out to Google *after* the
+  // response is sent. Only what actually moved — kept/unmoved blocks are
+  // never re-pushed.
+  type PushUpsert = {
+    taskId: string;
+    title: string;
+    start: string;
+    end: string;
+    eventId: string | null;
+  };
+  const pushUpserts: PushUpsert[] = [];
+  const pushDeletes: { taskId: string; eventId: string }[] = [];
+
   for (const block of result.placed) {
     const task = byId.get(block.task_id);
     if (!task) continue;
@@ -187,14 +204,27 @@ export async function POST(request: Request) {
       scheduled_start: block.start,
       scheduled_end: block.end,
     };
+    if (!unchanged) {
+      updates.push({ id: task.id, patch });
+      pushUpserts.push({
+        taskId: task.id,
+        title: task.title,
+        start: block.start,
+        end: block.end,
+        eventId: task.google_event_id,
+      });
+    }
     Object.assign(task, patch);
-    if (!unchanged) updates.push({ id: task.id, patch });
   }
 
   // Overflow isn't failure (§5.5): back to the tray, gently, still on today.
   for (const id of result.overflow) {
     const task = byId.get(id);
     if (!task) continue;
+    // A task that lost its placement loses its pushed Google event too.
+    if (task.google_event_id) {
+      pushDeletes.push({ taskId: id, eventId: task.google_event_id });
+    }
     const patch = {
       status: "todo" as const,
       scheduled_start: null,
@@ -218,9 +248,66 @@ export async function POST(request: Request) {
     if (results.some((r) => r.error)) return degraded();
   }
 
+  // Mirror moved blocks out to Google after the response is sent (§9 Phase 4).
+  // Plan latency never pays for a round-trip to Google, and a push failure
+  // costs only the mirror — the plan itself is already persisted above.
+  if (calendarAvailable() && (pushUpserts.length > 0 || pushDeletes.length > 0)) {
+    const userId = user.id;
+    after(async () => {
+      try {
+        const admin = createAdminClient();
+        const connection = await getConnection(admin, userId);
+        if (!connection) return;
+        const accessToken = await getAccessToken(admin, connection);
+        for (const del of pushDeletes) {
+          try {
+            await deleteEvent(accessToken, connection.calendar_id, del.eventId);
+            await admin
+              .from("tasks")
+              .update({ google_event_id: null })
+              .eq("id", del.taskId)
+              .eq("user_id", userId);
+          } catch {
+            // best-effort mirror; the pull's reflow_task_id exclusion means a
+            // straggler event can never poison the schedule
+          }
+        }
+        for (const up of pushUpserts) {
+          try {
+            const input = { summary: up.title, startIso: up.start, endIso: up.end };
+            if (up.eventId) {
+              const outcome = await patchEvent(
+                accessToken,
+                connection.calendar_id,
+                up.eventId,
+                input,
+              );
+              if (outcome === "ok") continue;
+              // deleted on Google's side — fall through and recreate
+            }
+            const newId = await insertEvent(accessToken, connection.calendar_id, {
+              ...input,
+              reflowTaskId: up.taskId,
+            });
+            await admin
+              .from("tasks")
+              .update({ google_event_id: newId })
+              .eq("id", up.taskId)
+              .eq("user_id", userId);
+          } catch {
+            // best-effort mirror
+          }
+        }
+      } catch {
+        // never let the mirror affect anything
+      }
+    });
+  }
+
   const responseTasks: DayTask[] = tasks.map((t) => {
-    const { created_at: _createdAt, ...day } = t;
+    const { created_at: _createdAt, google_event_id: _gid, ...day } = t;
     void _createdAt;
+    void _gid;
     return day;
   });
 

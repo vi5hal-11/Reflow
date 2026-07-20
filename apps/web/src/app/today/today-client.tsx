@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import type { CalendarStatus, CalendarSyncResult } from "@/lib/calendar/types";
 import {
   energyTags,
   type DayCalendarEvent,
@@ -96,12 +97,14 @@ export function TodayClient({
   initialTasks,
   calendarEvents,
   initialBig3Ids,
+  calendarStatus,
 }: {
   userId: string;
   profile: DayProfile;
   initialTasks: DayTask[];
   calendarEvents: DayCalendarEvent[];
   initialBig3Ids: string[];
+  calendarStatus: CalendarStatus;
 }) {
   const supabase = createClient();
   const today = localToday();
@@ -113,9 +116,21 @@ export function TodayClient({
   const [overflowIds, setOverflowIds] = useState<Set<string>>(new Set());
   const [planning, setPlanning] = useState(false);
   const [planNotice, setPlanNotice] = useState<string | null>(null);
+  // Calendar events live in state so a sync can replace them; the server
+  // prop is only the first paint.
+  const [calEvents, setCalEvents] = useState<DayCalendarEvent[]>(calendarEvents);
+  const [calendar, setCalendar] = useState<CalendarStatus>(calendarStatus);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(
+    calendarStatus.connected ? calendarStatus.lastSyncedAt : null,
+  );
+  const [syncedLabel, setSyncedLabel] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [calendarNotice, setCalendarNotice] = useState<string | null>(null);
   // Auto re-flow only after the user has planned once, at most once a minute.
   const hasPlannedRef = useRef(false);
   const lastReflowRef = useRef(0);
+  // Auto calendar sync at most once per five minutes (mount + tab focus).
+  const lastCalSyncRef = useRef(0);
 
   useEffect(() => {
     const t = setInterval(() => setNow(nowMinutes()), 30_000);
@@ -130,6 +145,29 @@ export function TodayClient({
       void supabase.from("profiles").update({ timezone: browserTz }).eq("id", userId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // A failed OAuth round-trip lands back here with ?calendar_error=1.
+  // Read window.location in an effect (no Suspense boundary needed) and
+  // strip the param so a refresh doesn't repeat the notice.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("calendar_error")) return;
+    url.searchParams.delete("calendar_error");
+    window.history.replaceState(
+      window.history.state,
+      "",
+      url.pathname + url.search + url.hash,
+    );
+    // Deferred so the effect body itself never sets state synchronously.
+    const t = setTimeout(
+      () =>
+        setCalendarNotice(
+          "couldn't connect the calendar — nothing lost, try again whenever",
+        ),
+      0,
+    );
+    return () => clearTimeout(t);
   }, []);
 
   const patchTask = useCallback((id: string, patch: Partial<DayTask>) => {
@@ -218,6 +256,101 @@ export function TodayClient({
     return () => window.removeEventListener("focus", onFocus);
   }, [planDay]);
 
+  const calendarConnected = calendar.available && calendar.connected;
+
+  // Pull external events (local yesterday → +7 days) and, if anything out
+  // there changed, let the plan quietly re-flow around it. Failures are
+  // silent — the cached events stand and the day view never degrades.
+  const syncCalendar = useCallback(
+    async (auto: boolean) => {
+      if (auto && Date.now() - lastCalSyncRef.current < 5 * 60_000) return;
+      lastCalSyncRef.current = Date.now();
+      if (!auto) setSyncing(true);
+      try {
+        const windowStart = new Date();
+        windowStart.setDate(windowStart.getDate() - 1);
+        windowStart.setHours(0, 0, 0, 0);
+        const windowEnd = new Date();
+        windowEnd.setDate(windowEnd.getDate() + 8);
+        windowEnd.setHours(0, 0, 0, 0);
+        const res = await fetch("/api/calendar/sync", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            windowStart: windowStart.toISOString(),
+            windowEnd: windowEnd.toISOString(),
+          }),
+        });
+        if (res.status === 409) {
+          // The Google link is gone (revoked elsewhere). Quietly show the
+          // connect affordance again; cached events stand.
+          setCalendar((c) =>
+            c.available ? { available: true, connected: false } : c,
+          );
+          return;
+        }
+        if (!res.ok) return; // 503 and friends — silent, cached events stand
+        const data = (await res.json()) as CalendarSyncResult;
+        setCalEvents(data.events);
+        setLastSyncedAt(new Date().toISOString());
+        // planDay's own 60s throttle keeps this from double-firing with the
+        // focus-driven re-flow above.
+        if (data.changed) void planDay(true);
+      } catch {
+        // silent — the cached events stand
+      } finally {
+        if (!auto) setSyncing(false);
+      }
+    },
+    [planDay],
+  );
+
+  useEffect(() => {
+    if (!calendarConnected) return;
+    const mountSync = setTimeout(() => void syncCalendar(true), 0);
+    const onFocus = () => void syncCalendar(true);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearTimeout(mountSync);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [calendarConnected, syncCalendar]);
+
+  // The "synced · 2m ago" whisper — computed on a timer, never at render.
+  // (Rendering also guards on lastSyncedAt, so a stale label never shows.)
+  useEffect(() => {
+    if (!lastSyncedAt) return;
+    const compute = () => {
+      const mins = Math.max(
+        0,
+        Math.floor((Date.now() - new Date(lastSyncedAt).getTime()) / 60_000),
+      );
+      if (mins < 1) setSyncedLabel("just now");
+      else if (mins < 60) setSyncedLabel(`${mins}m ago`);
+      else setSyncedLabel(`${Math.floor(mins / 60)}h ago`);
+    };
+    const first = setTimeout(compute, 0);
+    const t = setInterval(compute, 30_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(t);
+    };
+  }, [lastSyncedAt]);
+
+  const disconnectCalendar = useCallback(async () => {
+    try {
+      const res = await fetch("/api/calendar/disconnect", { method: "POST" });
+      if (res.ok) {
+        setCalendar((c) =>
+          c.available ? { available: true, connected: false } : c,
+        );
+        setLastSyncedAt(null);
+      }
+    } catch {
+      // silent — disconnecting can be retried anytime
+    }
+  }, []);
+
   const fixedBlocks = useMemo(() => {
     const taskBlocks = tasks
       .filter((t) => t.is_fixed && t.fixed_start && isLocalToday(t.fixed_start))
@@ -228,7 +361,7 @@ export function TodayClient({
         start: toMinutes(t.fixed_start!),
         end: toMinutes(t.fixed_start!) + (t.estimated_minutes ?? DEFAULT_FIXED_MINUTES),
       }));
-    const eventBlocks = calendarEvents
+    const eventBlocks = calEvents
       .filter((e) => e.is_busy && isLocalToday(e.start))
       .map((e) => ({
         key: `event-${e.id}`,
@@ -238,7 +371,7 @@ export function TodayClient({
         end: Math.max(toMinutes(e.end), toMinutes(e.start) + 15),
       }));
     return [...taskBlocks, ...eventBlocks];
-  }, [tasks, calendarEvents]);
+  }, [tasks, calEvents]);
 
   const placed = useMemo(
     () =>
@@ -496,8 +629,38 @@ export function TodayClient({
         <div>
           <span className="text-sm text-neutral-400">Reflow</span>
           <h1 className="text-2xl font-medium tracking-tight">{dateLabel}</h1>
+          {calendarConnected && lastSyncedAt && syncedLabel && (
+            <p className="text-[11px] text-neutral-300 dark:text-neutral-600">
+              calendar synced · {syncedLabel}
+            </p>
+          )}
         </div>
         <nav className="flex items-center gap-4 text-sm text-neutral-400">
+          {calendar.available && !calendar.connected && (
+            <a
+              href="/api/calendar/connect"
+              className="underline underline-offset-4 hover:text-neutral-600"
+            >
+              connect Google Calendar
+            </a>
+          )}
+          {calendar.available && calendar.connected && (
+            <span className="flex items-center gap-1.5 text-xs">
+              <span
+                className="max-w-36 truncate"
+                title={calendar.googleEmail ?? undefined}
+              >
+                {calendar.googleEmail ?? "Google Calendar"}
+              </span>
+              <button
+                onClick={() => void syncCalendar(false)}
+                disabled={syncing}
+                className="underline underline-offset-4 hover:text-neutral-600 disabled:opacity-60"
+              >
+                {syncing ? "syncing…" : "sync"}
+              </button>
+            </span>
+          )}
           <Link href="/inbox" className="underline underline-offset-4 hover:text-neutral-600">
             Inbox
           </Link>
@@ -514,6 +677,12 @@ export function TodayClient({
       {planNotice && (
         <p className="rounded-lg border border-neutral-200 px-4 py-2 text-sm text-neutral-500 dark:border-neutral-800">
           {planNotice}
+        </p>
+      )}
+
+      {calendarNotice && (
+        <p className="rounded-lg border border-neutral-200 px-4 py-2 text-sm text-neutral-500 dark:border-neutral-800">
+          {calendarNotice}
         </p>
       )}
 
@@ -831,6 +1000,17 @@ export function TodayClient({
 
       <p className="mt-auto pt-6 text-center text-xs text-neutral-300 dark:text-neutral-600">
         plan my day re-flows around what&apos;s fixed · placing by hand always works
+        {calendarConnected && (
+          <>
+            {" · "}
+            <button
+              onClick={() => void disconnectCalendar()}
+              className="underline underline-offset-2 hover:text-neutral-500"
+            >
+              disconnect calendar
+            </button>
+          </>
+        )}
       </p>
     </main>
   );
