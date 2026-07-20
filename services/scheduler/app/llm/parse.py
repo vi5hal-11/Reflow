@@ -1,20 +1,18 @@
 """Natural-language capture parsing — the LLM edge (CLAUDE.md §6).
 
-Uses Anthropic structured outputs so the response is schema-guaranteed at
-sampling time. Still validated with Pydantic (never trust LLM output), and
-any failure falls back to a bare task so capture never breaks.
+Gemini Flash (free tier — see DECISIONS.md) with a sampling-time response
+schema. Still validated with Pydantic (never trust LLM output), and any
+failure falls back to a bare task so capture never breaks.
 """
 
-import os
 from datetime import datetime
-from functools import lru_cache
 
-import anthropic
-from pydantic import BaseModel, Field
+import httpx
+from pydantic import BaseModel, Field, ValidationError
 
 from ..models import EnergyTag
+from . import gemini
 
-PARSE_MODEL = os.environ.get("PARSE_MODEL", "claude-opus-4-8")
 MAX_TITLE_LEN = 200
 
 SYSTEM_PROMPT = """You turn a user's raw capture text into a structured task suggestion for a daily planner.
@@ -27,6 +25,31 @@ Rules:
 - deadline: only when the text names or implies a date/time; resolve relative dates ("Friday", "tomorrow 5pm") against the provided current time and timezone; ISO 8601. Null otherwise — never invent one.
 - suggested_project: prefer an exact name from the provided project list; a new short name only when the text obviously names one; else null.
 - confidence: 0-1, how sure you are about the overall interpretation."""
+
+# Gemini responseSchema (OpenAPI subset). Kept by hand and mirrored by the
+# Pydantic model below — Pydantic is the authority, this only constrains
+# sampling.
+PARSE_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "is_task": {"type": "BOOLEAN"},
+        "title": {"type": "STRING"},
+        "estimated_minutes": {"type": "INTEGER", "nullable": True},
+        "energy_tag": {
+            "type": "STRING",
+            "enum": ["deep", "shallow", "admin"],
+            "nullable": True,
+        },
+        "deadline": {
+            "type": "STRING",
+            "nullable": True,
+            "description": "ISO 8601 datetime, or null",
+        },
+        "suggested_project": {"type": "STRING", "nullable": True},
+        "confidence": {"type": "NUMBER"},
+    },
+    "required": ["is_task", "title", "confidence"],
+}
 
 
 class ParsedTask(BaseModel):
@@ -53,12 +76,7 @@ class ParseResponse(ParsedTask):
 
 
 def is_configured() -> bool:
-    return bool(os.environ.get("ANTHROPIC_API_KEY"))
-
-
-@lru_cache(maxsize=1)
-def _client() -> anthropic.Anthropic:
-    return anthropic.Anthropic()
+    return gemini.is_configured()
 
 
 def _fallback(req: ParseRequest) -> ParseResponse:
@@ -78,16 +96,8 @@ def parse_capture(req: ParseRequest) -> ParseResponse:
         f"Capture text:\n{req.text}"
     )
     try:
-        result = _client().messages.parse(
-            model=PARSE_MODEL,
-            max_tokens=1024,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
-            output_format=ParsedTask,
-        )
-        parsed = result.parsed_output
-        if parsed is None:
-            return _fallback(req)
+        raw = gemini.generate_json(SYSTEM_PROMPT, prompt, PARSE_SCHEMA)
+        parsed = ParsedTask.model_validate(raw)
         # Semantic sanity the schema can't express: a "deadline" resolved
         # into the past is noise, not a deadline.
         if parsed.deadline is not None:
@@ -98,5 +108,5 @@ def parse_capture(req: ParseRequest) -> ParseResponse:
             if deadline < now:
                 parsed = parsed.model_copy(update={"deadline": None})
         return ParseResponse(**parsed.model_dump(), source="llm")
-    except (anthropic.APIError, anthropic.APIConnectionError, ValueError):
+    except (gemini.GeminiError, httpx.HTTPError, ValidationError, ValueError):
         return _fallback(req)

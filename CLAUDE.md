@@ -54,7 +54,7 @@ Aligned to the founder's existing stack. Don't introduce new frameworks without 
 | Styling | **Tailwind CSS + shadcn/ui** | Clean, fast, minimal. No heavy component libs. |
 | Scheduling & AI service | **FastAPI (Python)** | Houses the deterministic scheduler + LLM orchestration. Exposed as an internal API to the Next.js app. |
 | Auth + DB + realtime | **Supabase** (Postgres, Auth, Row-Level Security, Realtime) | RLS on every table from day one. |
-| LLM | **Anthropic API (Claude)** | Structured JSON output only. Used at the edges (see §1). |
+| LLM | **Google Gemini Flash (free tier)** | Founder call 2026-07-20 (was Anthropic — see DECISIONS.md): zero-cost AI Studio key. Structured JSON output only. Used at the edges (see §1). |
 | Calendar | **Google Calendar API** (OAuth) | Bidirectional sync. Phase 4. |
 | Payments | **Stripe** | Phase 6 / post-MVP gating. |
 | Hosting | Vercel (web) + Fly.io/Railway (FastAPI) + Supabase cloud | Keep infra boring. |

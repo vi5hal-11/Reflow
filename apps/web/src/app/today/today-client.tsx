@@ -122,6 +122,13 @@ export function TodayClient({
   const [planNotice, setPlanNotice] = useState<string | null>(null);
   const [padding, setPadding] = useState<Partial<Record<EnergyTag, number>>>({});
   const [momentum, setMomentum] = useState<MomentumDay[]>(initialMomentum);
+  const [reflection, setReflection] = useState<{
+    insight: string;
+    pattern: string | null;
+    encouragement: string;
+  } | null>(null);
+  const [reflecting, setReflecting] = useState(false);
+  const [reflectNotice, setReflectNotice] = useState<string | null>(null);
   // Calendar events live in state so a sync can replace them; the server
   // prop is only the first paint.
   const [calEvents, setCalEvents] = useState<DayCalendarEvent[]>(calendarEvents);
@@ -708,6 +715,74 @@ export function TodayClient({
     ([, f]) => f > 1.05,
   );
 
+  // End-of-day reflection (§9 Phase 6): summarize the day the client already
+  // holds and let the LLM edge find one kind, specific observation.
+  const reflect = useCallback(async () => {
+    setReflecting(true);
+    setReflectNotice(null);
+    try {
+      const dayTasks = tasks
+        .filter((t) => !t.is_fixed)
+        .filter(
+          (t) =>
+            t.planned_date === today ||
+            (t.scheduled_start && isLocalToday(t.scheduled_start)),
+        )
+        .slice(0, 100)
+        .map((t) => {
+          const actual =
+            t.status === "done" && t.scheduled_start
+              ? Math.round(
+                  (Date.now() - new Date(t.scheduled_start).getTime()) / 60_000,
+                )
+              : null;
+          return {
+            title: t.title,
+            status: (t.status === "inbox" ? "todo" : t.status) as
+              | "done"
+              | "scheduled"
+              | "todo"
+              | "rolled",
+            energy_tag: t.energy_tag,
+            estimated_minutes: t.estimated_minutes,
+            actual_minutes: actual !== null && actual >= 1 && actual <= 480 ? actual : null,
+            was_big3: big3Ids.includes(t.id) || t.is_big3,
+          };
+        });
+      const res = await fetch("/api/reflect", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          date: today,
+          meetings: fixedBlocks.length,
+          showed_up_days: active20,
+          window_days: denom20,
+          tasks: dayTasks,
+        }),
+      });
+      if (!res.ok) {
+        setReflectNotice(
+          "Reflection isn't available right now — the day still counts.",
+        );
+        return;
+      }
+      const data = (await res.json()) as {
+        insight: string;
+        pattern: string | null;
+        encouragement: string;
+      };
+      setReflection(data);
+    } catch {
+      setReflectNotice(
+        "Reflection isn't available right now — the day still counts.",
+      );
+    } finally {
+      setReflecting(false);
+    }
+  }, [tasks, today, big3Ids, fixedBlocks.length, active20, denom20]);
+
+  const eveningReached = now >= dayEnd - 60;
+
   const timelineHeight = (dayEnd - dayStart) * PX_PER_MIN;
   const hourMarks: number[] = [];
   for (let m = Math.ceil(dayStart / 60) * 60; m <= dayEnd; m += 60) hourMarks.push(m);
@@ -1171,6 +1246,34 @@ export function TodayClient({
           )}
         </aside>
       </div>
+
+      {/* End of day — one kind look back, never a report card */}
+      {(eveningReached || reflection) && (
+        <section aria-label="Reflection" className="space-y-2">
+          {reflection ? (
+            <div className="space-y-1.5 rounded-lg border border-neutral-200 px-4 py-3 text-sm dark:border-neutral-800">
+              <p>{reflection.insight}</p>
+              {reflection.pattern && (
+                <p className="text-neutral-500">{reflection.pattern}</p>
+              )}
+              <p className="text-neutral-400">{reflection.encouragement}</p>
+            </div>
+          ) : (
+            <div className="text-center">
+              <button
+                onClick={() => void reflect()}
+                disabled={reflecting}
+                className="text-xs text-neutral-400 underline underline-offset-4 hover:text-neutral-600 disabled:opacity-60"
+              >
+                {reflecting ? "looking back…" : "close the day — a short reflection"}
+              </button>
+            </div>
+          )}
+          {reflectNotice && (
+            <p className="text-center text-xs text-neutral-400">{reflectNotice}</p>
+          )}
+        </section>
+      )}
 
       <p className="mt-auto pt-6 text-center text-xs text-neutral-300 dark:text-neutral-600">
         plan my day re-flows around what&apos;s fixed · placing by hand always works

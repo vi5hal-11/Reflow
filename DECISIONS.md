@@ -2,6 +2,16 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-20 — Phase 6 (voice, reflection, export; LLM provider swap)
+
+- **LLM provider: Anthropic → Google Gemini Flash** (founder decision — no paid APIs). AI Studio key, free tier, no card; covers parse-on-capture + reflections comfortably. Thin REST client (`app/llm/gemini.py`, httpx, no SDK), sampling-time `responseSchema` + Pydantic re-validation, key sent via `x-goog-api-key` header (never in URLs/logs). The `anthropic` dependency is fully removed; `GEMINI_API_KEY` + optional `GEMINI_MODEL` (default `gemini-2.5-flash`) replace `ANTHROPIC_API_KEY`/`PARSE_MODEL`. CLAUDE.md §3 table updated.
+- **Stripe deferred entirely** (founder decision): no payments, no plan gating anywhere. Slots in post-PMF.
+- **/reflect tone is enforced in the contract**: the system prompt bans shame-words, the fallback is a warm deterministic summary from the numbers (tested for tone: no "only/just/fail/behind"), and reflection is ephemeral — displayed, not stored. No schema change.
+- **Voice capture is the browser's own Web Speech API**: free, no server round-trip, progressive enhancement (unsupported browsers never see the mic). Transcript captures directly with `source='voice'`.
+- **Export**: `GET /api/export?format=json|ical` — full user data as JSON, schedule as VCALENDAR — linked from the inbox footer. RLS-scoped via the user's own session client.
+- **Reflection payload comes from the client** (it already holds the day) — the BFF authenticates, Zod-bounds it, and proxies to the scheduler; a user can only ever "spoof" their own reflection.
+- **Google OAuth credentials verified** against the token endpoint (`invalid_grant`, not `invalid_client` → pair accepted) and placed in the founder's local env. Calendar sync still awaits `SUPABASE_SECRET_KEY` + redirect-URI registration on the founder's side. The pasted client secret should be rotated at some point since it transited chat.
+
 ## 2026-07-20 — Phase 5 (no-guilt polish + estimate learning)
 
 - **Roll-forward mechanics**: on `/today` load, tasks with `planned_date < today` and status `todo`/`scheduled` become `status='rolled'`, `planned_date=today`, placement cleared, `is_big3` released (Big 3 is a per-day choice, yesterday's stars don't auto-carry). Idempotent server-side UPDATE in the page render — safe on re-renders. `rolled` tasks live in the tray like todos (with a quiet "rolled" chip), are schedulable by engine and hand alike, and normalize back to `todo` when sent to Later.

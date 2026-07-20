@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Mic } from "lucide-react";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -11,6 +12,25 @@ function localToday(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+
+// Minimal surface of the (webkit-prefixed) Web Speech API — free, on-device
+// or browser-provided, no server round-trip. Voice capture is progressive
+// enhancement: unsupported browsers simply never see the mic.
+type SpeechRecognitionLike = {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type SpeechWindow = {
+  SpeechRecognition?: new () => SpeechRecognitionLike;
+  webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+};
 
 function chip(text: string) {
   return (
@@ -71,7 +91,7 @@ export function InboxClient({
   );
 
   const capture = useCallback(
-    async (raw: string) => {
+    async (raw: string, source: "text" | "voice" = "text") => {
       const trimmed = raw.trim();
       if (!trimmed) return;
       setText("");
@@ -100,7 +120,7 @@ export function InboxClient({
           title: trimmed,
           raw_text: trimmed,
           status: "inbox",
-          source: "text",
+          source,
         })
         .select(inboxTaskColumns)
         .single();
@@ -142,6 +162,43 @@ export function InboxClient({
     },
     [supabase, tasks.length],
   );
+
+  // Voice capture (§6): browser speech recognition → straight into the inbox
+  // with source='voice'. Never blocks; never required.
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const w = window as unknown as SpeechWindow;
+      setVoiceSupported(Boolean(w.SpeechRecognition ?? w.webkitSpeechRecognition));
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+
+  const startVoice = useCallback(() => {
+    const w = window as unknown as SpeechWindow;
+    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!Ctor) return;
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const rec = new Ctor();
+    recognitionRef.current = rec;
+    rec.lang = navigator.language || "en-US";
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript?.trim();
+      if (transcript) void capture(transcript, "voice");
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    setListening(true);
+    rec.start();
+  }, [listening, capture]);
 
   // Anti-graveyard (§6): items that sat for a week resurface in their own
   // gentle section below the fresh ones — keep, schedule, or drop.
@@ -210,6 +267,7 @@ export function InboxClient({
       </header>
 
       <form
+        className="relative"
         onSubmit={(e) => {
           e.preventDefault();
           void capture(text);
@@ -220,9 +278,32 @@ export function InboxClient({
           value={text}
           onChange={(e) => setText(e.target.value)}
           autoFocus
-          placeholder="Dump anything — press / to focus, Enter to capture"
-          className="w-full rounded-lg border border-neutral-300 bg-transparent px-4 py-3 text-base outline-none placeholder:text-neutral-400 focus:border-neutral-500 dark:border-neutral-700"
+          placeholder={
+            listening
+              ? "listening…"
+              : "Dump anything — press / to focus, Enter to capture"
+          }
+          className={cn(
+            "w-full rounded-lg border border-neutral-300 bg-transparent px-4 py-3 text-base outline-none placeholder:text-neutral-400 focus:border-neutral-500 dark:border-neutral-700",
+            voiceSupported && "pr-11",
+          )}
         />
+        {voiceSupported && (
+          <button
+            type="button"
+            onClick={startVoice}
+            aria-label={listening ? "Stop listening" : "Capture by voice"}
+            title={listening ? "Stop listening" : "Capture by voice"}
+            className={cn(
+              "absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-2",
+              listening
+                ? "animate-pulse text-neutral-900 dark:text-neutral-100"
+                : "text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300",
+            )}
+          >
+            <Mic className="h-4 w-4" />
+          </button>
+        )}
       </form>
 
       {tasks.length === 0 ? (
@@ -296,7 +377,14 @@ export function InboxClient({
       )}
 
       <p className="mt-auto text-center text-xs text-neutral-300 dark:text-neutral-600">
-        / capture · j/k move · t today · l later · x drop
+        / capture · j/k move · t today · l later · x drop · export:{" "}
+        <a href="/api/export?format=json" className="underline underline-offset-2">
+          json
+        </a>{" "}
+        ·{" "}
+        <a href="/api/export?format=ical" className="underline underline-offset-2">
+          ical
+        </a>
       </p>
     </main>
   );
