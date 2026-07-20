@@ -5,7 +5,12 @@ Owns exactly two responsibilities (CLAUDE.md §3):
 - POST /parse, POST /reflect — LLM edges (Phase 1 / Phase 6)
 """
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+
+# Local-dev convenience: pick up services/scheduler/.env (copy .env.example).
+# Real environment variables always win; deployed platforms set them directly.
+load_dotenv()
 
 from .engine.schedule import plan
 from .llm import parse as llm_parse
