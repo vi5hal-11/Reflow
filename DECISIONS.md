@@ -2,6 +2,14 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-20 — Phase 5 (no-guilt polish + estimate learning)
+
+- **Roll-forward mechanics**: on `/today` load, tasks with `planned_date < today` and status `todo`/`scheduled` become `status='rolled'`, `planned_date=today`, placement cleared, `is_big3` released (Big 3 is a per-day choice, yesterday's stars don't auto-carry). Idempotent server-side UPDATE in the page render — safe on re-renders. `rolled` tasks live in the tray like todos (with a quiet "rolled" chip), are schedulable by engine and hand alike, and normalize back to `todo` when sent to Later.
+- **Momentum semantics** (no migration needed): no row = quiet absence; `active=true` = showed up (written when any task is completed); an explicit `active=false` row = a chosen **rest day** — deliberate, dims differently, and is excluded from the denominator ("8 of the last 18 days · 2 rest"). Comeback framing appears after a ≥3-day gap with real history behind it. No streak counter exists anywhere.
+- **Actual-minutes heuristic**: on completing a scheduled task, `actual = now − scheduled_start`, logged only when it lands in [1min, 8h] — completing a block you never started teaches the corrector nothing. Good enough until real time-tracking (post-MVP, if ever).
+- **Estimate padding is transparent and one-directional**: per-energy-tag factor = mean(actual/estimated) over the last 60 completions, needs ≥3 samples, only ever pads **up** (never shrinks a human's estimate), capped at 2×. Applied in the plan BFF before the engine sees estimates; the response carries the factors and the day view whispers "estimates padded from your history: deep +40%".
+- **Inbox resurfacing is in-app, not email**: items sitting ≥7 days split into a "from a while back — keep, schedule, or drop?" section with a "12d here" chip. A weekly digest email is a Phase 6+ concern; the surface matters more than the channel.
+
 ## 2026-07-20 — Phase 4 (Google Calendar, bidirectional)
 
 - **Token storage is service-role-only**: `calendar_connections` (migration 0004, applied) has RLS enabled with deliberately **zero policies** — the browser can never read refresh tokens; the only path is `lib/supabase/admin.ts` (secret key, guarded against client-bundle import). Supabase's advisor flags this as INFO "RLS enabled no policy" — that's the design, not an oversight. Tokens are stored unencrypted at rest for MVP; revisit before multi-user launch.

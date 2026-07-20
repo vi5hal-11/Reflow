@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { inboxTaskColumns, type InboxTask } from "@/lib/types";
@@ -143,6 +143,14 @@ export function InboxClient({
     [supabase, tasks.length],
   );
 
+  // Anti-graveyard (§6): items that sat for a week resurface in their own
+  // gentle section below the fresh ones — keep, schedule, or drop.
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  const nowMs = new Date().getTime();
+  const firstOldIndex = tasks.findIndex(
+    (t) => nowMs - new Date(t.created_at).getTime() >= WEEK_MS,
+  );
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const inOmnibox = document.activeElement === inputRef.current;
@@ -224,8 +232,16 @@ export function InboxClient({
       ) : (
         <ul className="flex flex-col gap-2">
           {tasks.map((task, i) => (
+            <Fragment key={task.id}>
+            {i === firstOldIndex && (
+              <li
+                aria-hidden
+                className="pt-3 text-[11px] text-neutral-400"
+              >
+                from a while back — keep, schedule, or drop?
+              </li>
+            )}
             <li
-              key={task.id}
               onClick={() => setSelected(i)}
               className={cn(
                 "group flex items-center justify-between gap-3 rounded-lg border px-4 py-3",
@@ -246,6 +262,10 @@ export function InboxClient({
                     chip(`due ${new Date(task.deadline).toLocaleDateString()}`)}
                   {task.parse_suggestions?.suggested_project &&
                     chip(`# ${task.parse_suggestions.suggested_project}`)}
+                  {nowMs - new Date(task.created_at).getTime() >= WEEK_MS &&
+                    chip(
+                      `${Math.floor((nowMs - new Date(task.created_at).getTime()) / 86_400_000)}d here`,
+                    )}
                 </div>
               </div>
               <div className="flex shrink-0 gap-1 text-xs">
@@ -270,6 +290,7 @@ export function InboxClient({
                 </button>
               </div>
             </li>
+            </Fragment>
           ))}
         </ul>
       )}

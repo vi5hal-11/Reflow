@@ -23,12 +23,12 @@ export default async function InboxPage() {
       supabase
         .from("tasks")
         .select("id", { count: "exact", head: true })
-        .eq("status", "todo")
+        .in("status", ["todo", "rolled"])
         .eq("planned_date", today),
       supabase
         .from("tasks")
         .select("id", { count: "exact", head: true })
-        .eq("status", "todo")
+        .in("status", ["todo", "rolled"])
         .is("planned_date", null),
     ]);
 

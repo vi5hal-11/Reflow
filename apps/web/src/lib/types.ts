@@ -82,4 +82,16 @@ export type PlanResponse = {
   tasks: DayTask[];
   wildcards: PlanWildcard[];
   overflow: string[];
+  // Phase 5: per-energy-tag estimate correction applied to this plan, from
+  // the user's own history. Only present when a tag was actually padded
+  // (factor > 1) — surfaced transparently, never silently.
+  padding?: Partial<Record<EnergyTag, number>>;
+};
+
+// Phase 5: one dot of the momentum strip. No row for a day = quiet absence;
+// active=true = showed up; an explicit active=false row = a chosen rest day
+// (deliberate, not a miss — it dims differently and doesn't count against).
+export type MomentumDay = {
+  metric_date: string; // YYYY-MM-DD
+  active: boolean;
 };

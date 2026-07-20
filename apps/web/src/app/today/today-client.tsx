@@ -10,6 +10,8 @@ import {
   type DayCalendarEvent,
   type DayProfile,
   type DayTask,
+  type EnergyTag,
+  type MomentumDay,
   type PlanResponse,
   type PlanWildcard,
 } from "@/lib/types";
@@ -97,6 +99,7 @@ export function TodayClient({
   initialTasks,
   calendarEvents,
   initialBig3Ids,
+  initialMomentum,
   calendarStatus,
 }: {
   userId: string;
@@ -104,6 +107,7 @@ export function TodayClient({
   initialTasks: DayTask[];
   calendarEvents: DayCalendarEvent[];
   initialBig3Ids: string[];
+  initialMomentum: MomentumDay[];
   calendarStatus: CalendarStatus;
 }) {
   const supabase = createClient();
@@ -116,6 +120,8 @@ export function TodayClient({
   const [overflowIds, setOverflowIds] = useState<Set<string>>(new Set());
   const [planning, setPlanning] = useState(false);
   const [planNotice, setPlanNotice] = useState<string | null>(null);
+  const [padding, setPadding] = useState<Partial<Record<EnergyTag, number>>>({});
+  const [momentum, setMomentum] = useState<MomentumDay[]>(initialMomentum);
   // Calendar events live in state so a sync can replace them; the server
   // prop is only the first paint.
   const [calEvents, setCalEvents] = useState<DayCalendarEvent[]>(calendarEvents);
@@ -235,6 +241,7 @@ export function TodayClient({
         });
         setWildcards(data.wildcards);
         setOverflowIds(new Set(data.overflow));
+        setPadding(data.padding ?? {});
         setPlacingId(null);
       } catch {
         if (!auto)
@@ -388,7 +395,10 @@ export function TodayClient({
   const tray = useMemo(
     () =>
       tasks.filter(
-        (t) => !t.is_fixed && t.status === "todo" && t.planned_date === today,
+        (t) =>
+          !t.is_fixed &&
+          (t.status === "todo" || t.status === "rolled") &&
+          t.planned_date === today,
       ),
     [tasks, today],
   );
@@ -478,6 +488,41 @@ export function TodayClient({
     [supabase, patchTask],
   );
 
+  // Completing a task also (a) marks today active on the momentum strip and
+  // (b) logs estimate-vs-actual when the task ran in a real block — both
+  // fire-and-forget; the checkmark never waits on them.
+  const recordCompletion = useCallback(
+    (task: DayTask) => {
+      const day = localToday();
+      setMomentum((prev) => {
+        const rest = prev.filter((m) => m.metric_date !== day);
+        return [...rest, { metric_date: day, active: true }];
+      });
+      void supabase
+        .from("momentum")
+        .upsert(
+          { user_id: userId, metric_date: day, active: true },
+          { onConflict: "user_id,metric_date" },
+        );
+      if (!task.is_fixed && task.estimated_minutes && task.scheduled_start) {
+        const actual = Math.round(
+          (Date.now() - new Date(task.scheduled_start).getTime()) / 60_000,
+        );
+        // Only log when the block actually ran: finishing before it started
+        // (or a wildly stale block) teaches the corrector nothing true.
+        if (actual >= 1 && actual <= 8 * 60) {
+          void supabase.from("estimate_history").insert({
+            user_id: userId,
+            energy_tag: task.energy_tag,
+            estimated_minutes: task.estimated_minutes,
+            actual_minutes: actual,
+          });
+        }
+      }
+    },
+    [supabase, userId],
+  );
+
   const toggleDone = useCallback(
     async (task: DayTask) => {
       const wasDone = task.status === "done";
@@ -492,20 +537,23 @@ export function TodayClient({
         .update({ status: nextStatus })
         .eq("id", task.id);
       if (error) patchTask(task.id, { status: task.status });
-      else void planDay(true);
+      else {
+        if (!wasDone) recordCompletion(task);
+        void planDay(true);
+      }
     },
-    [supabase, patchTask, planDay],
+    [supabase, patchTask, planDay, recordCompletion],
   );
 
   const moveToLater = useCallback(
     async (task: DayTask) => {
       const prev = { ...task };
       const nextIds = big3Ids.filter((id) => id !== task.id);
-      patchTask(task.id, { planned_date: null });
+      patchTask(task.id, { planned_date: null, status: "todo" });
       setBig3Ids(nextIds);
       const { error: taskError } = await supabase
         .from("tasks")
-        .update({ planned_date: null, is_big3: false })
+        .update({ planned_date: null, is_big3: false, status: "todo" })
         .eq("id", task.id);
       const { error: planError } =
         nextIds.length !== big3Ids.length
@@ -586,6 +634,79 @@ export function TodayClient({
     .map((id) => tasks.find((t) => t.id === id))
     .filter((t): t is DayTask => Boolean(t));
   const big3Done = big3.length > 0 && big3.every((t) => t.status === "done");
+
+  // --- momentum (§7): a rolling strip, never a breakable streak ------------
+  const momentumByDate = useMemo(
+    () => new Map(momentum.map((m) => [m.metric_date, m.active])),
+    [momentum],
+  );
+
+  const momentumDays = useMemo(() => {
+    const out: { date: string; state: "active" | "rest" | "none"; isToday: boolean }[] = [];
+    const d = new Date();
+    d.setDate(d.getDate() - 27);
+    for (let i = 0; i < 28; i++) {
+      const key = fmtDate(d);
+      const val = momentumByDate.get(key);
+      out.push({
+        date: key,
+        state: val === true ? "active" : val === false ? "rest" : "none",
+        isToday: key === today,
+      });
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  }, [momentumByDate, today]);
+
+  const last20 = momentumDays.slice(-20);
+  const active20 = last20.filter((x) => x.state === "active").length;
+  const rest20 = last20.filter((x) => x.state === "rest").length;
+  const denom20 = Math.max(1, 20 - rest20);
+
+  // Comeback framing: a gap before today, with real history behind it,
+  // earns a welcome — recovery is the success metric, not the streak.
+  const comebackGap = useMemo(() => {
+    if (!momentum.some((m) => m.active)) return null;
+    let gap = 0;
+    const d = new Date();
+    for (let i = 0; i < 27; i++) {
+      d.setDate(d.getDate() - 1);
+      const val = momentumByDate.get(fmtDate(d));
+      if (val === undefined) gap += 1;
+      else break;
+    }
+    return gap >= 3 ? gap : null;
+  }, [momentum, momentumByDate]);
+
+  const todayIsRest = momentumByDate.get(today) === false;
+
+  const toggleRestDay = useCallback(async () => {
+    const day = localToday();
+    if (momentumByDate.get(day) === false) {
+      setMomentum((prev) => prev.filter((m) => m.metric_date !== day));
+      await supabase
+        .from("momentum")
+        .delete()
+        .eq("user_id", userId)
+        .eq("metric_date", day);
+    } else {
+      setMomentum((prev) => [
+        ...prev.filter((m) => m.metric_date !== day),
+        { metric_date: day, active: false },
+      ]);
+      await supabase
+        .from("momentum")
+        .upsert(
+          { user_id: userId, metric_date: day, active: false },
+          { onConflict: "user_id,metric_date" },
+        );
+    }
+  }, [momentumByDate, supabase, userId]);
+
+  const rolledCount = tray.filter((t) => t.status === "rolled").length;
+  const paddedTags = (Object.entries(padding) as [EnergyTag, number][]).filter(
+    ([, f]) => f > 1.05,
+  );
 
   const timelineHeight = (dayEnd - dayStart) * PX_PER_MIN;
   const hourMarks: number[] = [];
@@ -677,6 +798,48 @@ export function TodayClient({
       {planNotice && (
         <p className="rounded-lg border border-neutral-200 px-4 py-2 text-sm text-neutral-500 dark:border-neutral-800">
           {planNotice}
+        </p>
+      )}
+
+      {/* Momentum — dims, never resets (§7) */}
+      <section aria-label="Momentum" className="space-y-2">
+        {comebackGap !== null && (
+          <p className="rounded-lg border border-neutral-200 px-4 py-2 text-sm text-neutral-600 dark:border-neutral-800 dark:text-neutral-300">
+            welcome back — you&apos;ve shown up {active20} of the last {denom20}{" "}
+            days. that counts.
+          </p>
+        )}
+        <div className="flex items-center gap-3">
+          <div className="flex gap-0.75" aria-hidden>
+            {momentumDays.map((d) => (
+              <span
+                key={d.date}
+                title={d.date}
+                className={cn(
+                  "h-2 w-2 rounded-[3px]",
+                  d.state === "active" &&
+                    "bg-neutral-700 dark:bg-neutral-200",
+                  d.state === "rest" &&
+                    "border border-neutral-300 bg-transparent dark:border-neutral-600",
+                  d.state === "none" && "bg-neutral-100 dark:bg-neutral-900",
+                  d.isToday && "ring-1 ring-neutral-400 ring-offset-1 dark:ring-neutral-500",
+                )}
+              />
+            ))}
+          </div>
+          <span className="text-[11px] text-neutral-400">
+            {active20} of the last {denom20} days
+            {rest20 > 0 && ` · ${rest20} rest`}
+          </span>
+        </div>
+      </section>
+
+      {paddedTags.length > 0 && (
+        <p className="text-[11px] text-neutral-400">
+          estimates padded from your history:{" "}
+          {paddedTags
+            .map(([tag, f]) => `${tag} +${Math.round((f - 1) * 100)}%`)
+            .join(" · ")}
         </p>
       )}
 
@@ -892,6 +1055,12 @@ export function TodayClient({
         {/* Tray — today's tasks awaiting a slot */}
         <aside aria-label="To place" className="space-y-2">
           <h2 className="text-sm font-medium text-neutral-500">To place</h2>
+          {rolledCount > 0 && (
+            <p className="text-[11px] text-neutral-400">
+              {rolledCount} rolled forward from before — fresh start, no
+              baggage
+            </p>
+          )}
           {tray.length === 0 ? (
             <p className="text-xs text-neutral-400">
               Nothing waiting. Triage the{" "}
@@ -914,6 +1083,11 @@ export function TodayClient({
                 >
                   <div className="flex items-center gap-1">
                     <span className="min-w-0 flex-1 truncate">{t.title}</span>
+                    {t.status === "rolled" && (
+                      <span className="shrink-0 rounded-full border border-neutral-200 px-1.5 py-0.5 text-[10px] text-neutral-400 dark:border-neutral-800">
+                        rolled
+                      </span>
+                    )}
                     {star(t)}
                   </div>
                   {overflowIds.has(t.id) && (
@@ -1000,6 +1174,13 @@ export function TodayClient({
 
       <p className="mt-auto pt-6 text-center text-xs text-neutral-300 dark:text-neutral-600">
         plan my day re-flows around what&apos;s fixed · placing by hand always works
+        {" · "}
+        <button
+          onClick={() => void toggleRestDay()}
+          className="underline underline-offset-2 hover:text-neutral-500"
+        >
+          {todayIsRest ? "rest day ✓ — undo" : "mark today a rest day"}
+        </button>
         {calendarConnected && (
           <>
             {" · "}

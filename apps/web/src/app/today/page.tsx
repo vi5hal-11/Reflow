@@ -6,6 +6,7 @@ import {
   type DayCalendarEvent,
   type DayProfile,
   type DayTask,
+  type MomentumDay,
 } from "@/lib/types";
 import { TodayClient } from "./today-client";
 
@@ -49,7 +50,26 @@ export default async function TodayPage() {
   const windowStart = new Date(nowMs - 36 * 60 * 60 * 1000).toISOString();
   const windowEnd = new Date(nowMs + 36 * 60 * 60 * 1000).toISOString();
 
-  const [{ data: tasks }, { data: events }, { data: plan }, calendarStatus] =
+  // Soft roll-forward (§7): whatever yesterday left unfinished quietly moves
+  // into today as `rolled` — placement cleared, yesterday's Big 3 badge
+  // released, nothing marked overdue. Idempotent, so re-renders are harmless.
+  await supabase
+    .from("tasks")
+    .update({
+      planned_date: today,
+      status: "rolled",
+      scheduled_start: null,
+      scheduled_end: null,
+      is_big3: false,
+    })
+    .lt("planned_date", today)
+    .in("status", ["todo", "scheduled"]);
+
+  const momentumSince = new Date(nowMs - 27 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+
+  const [{ data: tasks }, { data: events }, { data: plan }, { data: momentum }, calendarStatus] =
     await Promise.all([
     supabase
       .from("tasks")
@@ -73,6 +93,11 @@ export default async function TodayPage() {
       .select("id, plan_date, big3_task_ids")
       .eq("plan_date", today)
       .maybeSingle(),
+    supabase
+      .from("momentum")
+      .select("metric_date, active")
+      .gte("metric_date", momentumSince)
+      .order("metric_date", { ascending: true }),
     getCalendarStatus(user.id),
   ]);
 
@@ -91,6 +116,7 @@ export default async function TodayPage() {
       initialTasks={(tasks ?? []) as DayTask[]}
       calendarEvents={(events ?? []) as DayCalendarEvent[]}
       initialBig3Ids={(plan?.big3_task_ids as string[] | null) ?? []}
+      initialMomentum={(momentum ?? []) as MomentumDay[]}
       calendarStatus={calendarStatus}
     />
   );

@@ -9,6 +9,7 @@ import {
   dayTaskColumns,
   energyTags,
   type DayTask,
+  type EnergyTag,
   type PlanResponse,
 } from "@/lib/types";
 
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
         .neq("status", "inbox")
         .or(
           [
-            `and(status.eq.todo,planned_date.eq.${date})`,
+            `and(status.in.(todo,rolled),planned_date.eq.${date})`,
             `and(status.in.(scheduled,done),scheduled_start.gte.${workingWindowStart},scheduled_start.lte.${workingWindowEnd})`,
             `and(is_fixed.eq.true,fixed_start.gte.${workingWindowStart},fixed_start.lte.${workingWindowEnd})`,
           ].join(","),
@@ -135,14 +136,45 @@ export async function POST(request: Request) {
     })),
   ];
 
-  // Flexible = today's todos + still-pending scheduled tasks, carrying their
-  // current placement so the engine can keep still-valid blocks (stable re-flow).
+  // Phase 5 estimate learning: people chronically under-estimate. Derive a
+  // per-energy-tag correction factor from the user's own history (mean
+  // actual/estimated over recent completions, only ever padding up, capped
+  // at 2×) and stretch estimates before the engine sees them. Surfaced in
+  // the response — padding is transparent, never silent.
+  const { data: history } = await supabase
+    .from("estimate_history")
+    .select("energy_tag, estimated_minutes, actual_minutes")
+    .order("created_at", { ascending: false })
+    .limit(60);
+  const padding: Partial<Record<EnergyTag, number>> = {};
+  for (const tag of energyTags) {
+    const ratios = (history ?? [])
+      .filter((h) => h.energy_tag === tag && h.estimated_minutes > 0)
+      .map((h) => h.actual_minutes / h.estimated_minutes);
+    if (ratios.length < 3) continue; // not enough signal to pad honestly
+    const mean = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+    const factor = Math.min(2, Math.max(1, mean));
+    if (factor > 1.05) padding[tag] = Math.round(factor * 100) / 100;
+  }
+  const padded = (t: PlanTask): number => {
+    const base = t.estimated_minutes ?? DEFAULT_TASK_MINUTES;
+    const factor = t.energy_tag ? (padding[t.energy_tag] ?? 1) : 1;
+    return Math.round(base * factor);
+  };
+
+  // Flexible = today's todos (rolled ones included — they re-flow like any
+  // other) + still-pending scheduled tasks, carrying their current placement
+  // so the engine can keep still-valid blocks (stable re-flow).
   const flexibleTasks = tasks
-    .filter((t) => !t.is_fixed && (t.status === "todo" || t.status === "scheduled"))
+    .filter(
+      (t) =>
+        !t.is_fixed &&
+        (t.status === "todo" || t.status === "rolled" || t.status === "scheduled"),
+    )
     .map((t) => ({
       id: t.id,
       title: t.title,
-      estimated_minutes: t.estimated_minutes ?? DEFAULT_TASK_MINUTES,
+      estimated_minutes: padded(t),
       energy_tag: t.energy_tag,
       priority: t.priority ?? 2,
       deadline: t.deadline,
@@ -315,6 +347,7 @@ export async function POST(request: Request) {
     tasks: responseTasks,
     wildcards: result.wildcards,
     overflow: result.overflow,
+    ...(Object.keys(padding).length > 0 ? { padding } : {}),
   };
   return NextResponse.json(response);
 }
