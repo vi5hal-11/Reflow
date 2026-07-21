@@ -2,6 +2,13 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-21 — Phase 10 (mobile nav shell + task editing)
+
+- **Mobile tab bar** (`src/components/app-shell/tab-bar.tsx`): a fixed bottom nav (Today / Inbox / Settings, lucide icons, sage active state) that self-hides on desktop (`sm:hidden`) and on public routes (pathname guard), sits above `env(safe-area-inset-bottom)`, ≥44px targets. Mounted once in `providers.tsx`; the three app pages gained `pb-28 sm:pb-*` clearance and the settings save-bar lifts above the bar on mobile.
+- **Task editing** — the accept/override half of §6, previously impossible: clicking a captured task's title opens a **Sheet** (`src/components/ui/sheet.tsx` — bottom-sheet on phones, centered dialog on desktop; Escape/overlay close, focus-in-on-open + restore, body-scroll lock, `sheet-up` motion). The inbox edit form (`inbox/edit-sheet.tsx`) edits title / estimate / energy / deadline with an optimistic save + toast; temp (pre-persist) items aren't editable.
+- **Scope call (honest)**: the plan's Phase 10 was a 3-stream workflow (task-editing ∥ projects ∥ mobile-nav). Given the run-to-completion pass and that the two prior build-workflows hit session limits mid-run, I built inline. **Projects CRUD (10-B) and today-view task-editing are deferred** to a follow-up — the Sheet + edit form are reusable for both. Recorded so the gap is explicit, not silent.
+- Verified: tsc + lint + build green. Sheet is dependency-free (no shadcn/Radix pulled).
+
 ## 2026-07-21 — Phase 9 (settings & profile UI — the biggest functional gap)
 
 - **`/settings`** (server page + client) finally lets users write what the scheduler already reads: display name, timezone, working-hours window, default buffer, and the **energy profile**. Until now these sat at DB defaults, so "energy-aware scheduling" was unpersonalized — this unlocks the core promise.

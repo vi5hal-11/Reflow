@@ -164,7 +164,7 @@ export function SettingsClient({
   const calendarConnected = calendar.available && calendar.connected;
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-10 px-6 py-10">
+    <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-10 px-6 py-10 pb-28 sm:pb-10">
       <header className="flex items-baseline justify-between">
         <div>
           <span className="text-sm text-faint">Reflow</span>
@@ -381,7 +381,7 @@ export function SettingsClient({
         </div>
       </section>
 
-      <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+1rem)] flex justify-end">
+      <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] flex justify-end sm:bottom-4">
         <Button onClick={() => void save()} disabled={saving}>
           {saving ? "Saving…" : "Save settings"}
         </Button>

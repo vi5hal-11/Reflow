@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { inboxTaskColumns, type InboxTask } from "@/lib/types";
 import { signOut } from "../login/actions";
+import { TaskEditSheet } from "./edit-sheet";
 
 function localToday(): string {
   const d = new Date();
@@ -58,6 +59,7 @@ export function InboxClient({
   const [text, setText] = useState("");
   const [selected, setSelected] = useState(0);
   const [parsing, setParsing] = useState<Set<string>>(new Set());
+  const [editing, setEditing] = useState<InboxTask | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const patchTask = useCallback((id: string, patch: Partial<InboxTask>) => {
@@ -245,7 +247,7 @@ export function InboxClient({
   }, [tasks, selected, triage]);
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-8 px-6 py-12">
+    <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-8 px-6 py-12 pb-28 sm:pb-12">
       <header className="flex items-baseline justify-between">
         <div>
           <Link href="/" className="text-sm text-faint">
@@ -335,7 +337,15 @@ export function InboxClient({
               )}
             >
               <div className="min-w-0">
-                <p className="truncate">{task.title}</p>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!task.id.startsWith("temp-")) setEditing(task);
+                  }}
+                  className="block max-w-full truncate text-left hover:text-accent-text"
+                >
+                  {task.title}
+                </button>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   {parsing.has(task.id) && (
                     <span className="text-xs text-faint">thinking…</span>
@@ -389,6 +399,14 @@ export function InboxClient({
           ical
         </a>
       </p>
+
+      {editing && (
+        <TaskEditSheet
+          task={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(patch) => patchTask(editing.id, patch)}
+        />
+      )}
     </main>
   );
 }

@@ -820,7 +820,7 @@ export function TodayClient({
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col gap-6 px-6 py-10">
+    <main className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col gap-6 px-6 py-10 pb-28 sm:pb-10">
       <header className="flex items-baseline justify-between">
         <div>
           <span className="text-sm text-faint">Reflow</span>

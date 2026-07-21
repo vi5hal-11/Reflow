@@ -123,6 +123,17 @@ body {
   }
 }
 
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Tabular figures — load-bearing so time labels never jitter. */
 .tabular {
   font-variant-numeric: tabular-nums;
