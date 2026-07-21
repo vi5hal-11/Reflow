@@ -2,6 +2,15 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-21 — Phase 11 (mobile / PWA)
+
+- **Real app icon** — a "Warm Paper, One Flow" mark (sage flow-curve + now-node on a paper tile) as `public/icon.svg`, rasterized with `sharp` (bundled) to `icon-192/512.png`, a padded `icon-maskable-512.png`, plus `app/apple-icon.png` (180) and `app/icon.png` (32, modern favicon). The previously-referenced-but-missing PNGs now exist.
+- **Manifest** rebuilt: tokens for `theme_color`/`background_color` (#FAF8F2), `start_url:/today`, `display:standalone`, `id`, portrait, categories, the SVG + PNG + maskable icon set, `shortcuts` (Today, Inbox), and a **`share_target`** (GET title/text/url).
+- **Share route** `app/share/page.tsx`: the OS share sheet lands here, drops the shared content into the inbox (`source:'share'`, zero-friction, no confirm step) and bounces to `/inbox`; unauthenticated → `/login`.
+- **Responsive pass**: redundant top-nav links (Today/Inbox/Settings) are `hidden … sm:inline` on mobile since the bottom tab bar already covers them — decluttering the mobile header; the primary action (Plan my day) and sign-out stay.
+- **Deferred (noted, not silent)**: the offline service-worker / app-shell cache — the riskiest, least-critical item; a buggy SW can brick the app, so it's a deliberate follow-up. Capture is already optimistic; the app just isn't offline-launchable yet.
+- Verified: clean-server smoke test — icons 200, manifest emits share_target + 4 icons + correct theme/start, `/share` auth-redirects. (A stale dev server on :3000 from an earlier phase was masking results; killed.)
+
 ## 2026-07-21 — Phase 10 (mobile nav shell + task editing)
 
 - **Mobile tab bar** (`src/components/app-shell/tab-bar.tsx`): a fixed bottom nav (Today / Inbox / Settings, lucide icons, sage active state) that self-hides on desktop (`sm:hidden`) and on public routes (pathname guard), sits above `env(safe-area-inset-bottom)`, ≥44px targets. Mounted once in `providers.tsx`; the three app pages gained `pb-28 sm:pb-*` clearance and the settings save-bar lifts above the bar on mobile.

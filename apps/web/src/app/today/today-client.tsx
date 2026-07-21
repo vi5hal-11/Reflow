@@ -857,10 +857,10 @@ export function TodayClient({
               </button>
             </span>
           )}
-          <Link href="/inbox" className="underline underline-offset-4 hover:text-muted">
+          <Link href="/inbox" className="hidden underline underline-offset-4 hover:text-muted sm:inline">
             Inbox
           </Link>
-          <Link href="/settings" className="underline underline-offset-4 hover:text-muted">
+          <Link href="/settings" className="hidden underline underline-offset-4 hover:text-muted sm:inline">
             Settings
           </Link>
           <button
