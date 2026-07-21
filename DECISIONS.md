@@ -2,6 +2,14 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-21 — Phase 7 (design foundation) + design identity locked
+
+- **Identity "Warm Paper, One Flow"** chosen via an 8-agent research workflow (inspiration galleries + real planner products + motion/color/PWA articles) → benchmark scoring → founder picked all 8 recommended options. Full spec: `apps/web/src/app/DESIGN.md`. Accent = eucalyptus/sage `#6E9A78`/`#8CBE97` (the single "flow" color); Geist (UI, tabular) + Fraunces (display, rationed); warm paper `#FAF8F2` / warm ink `#2C2B27`, warm-charcoal dark peer `#16181A`, light default; 12px soft-calm flat feel; "Gentle Glide" ease-in-out FLIP motion; single-spine timeline; persistent-capture-pill + 2-tab mobile shell; "Whisper & Settle" + Daily-Arc emotional layer.
+- **Token layer (this phase)**: rewrote `globals.css` — CSS-variable ramps for light + warm-charcoal dark (via `prefers-color-scheme`, `[data-theme]` override wins both ways), mapped into Tailwind v4 `@theme inline` so utilities exist (`bg-paper`, `text-ink/muted/faint`, `border-line`, `bg-accent`, `text-accent-text`, `rounded`/`rounded-sm/lg`, `font-display`). Added motion tokens, `.tabular`, accent focus-ring, warm selection, and a global `prefers-reduced-motion` floor. **Fixed the `body { font-family: Arial }` bug** → Geist.
+- **Fraunces** added via `next/font/google` with `axes: ["opsz","SOFT"]` + italic, `display:swap` (self-hosted, no runtime CDN — CSP-safe). `layout.tsx` also gained the `viewport` export (`viewport-fit=cover`, light/dark `themeColor`).
+- **Refit** the two first-impression surfaces (landing, login) onto tokens + Fraunces. `today`/`inbox` deliberately deferred to Phase 8 (component extraction) — they inherit the warm paper background now and don't look broken, but their full token migration comes with the component system.
+- **Execution**: Phase 7 is `[inline]` per plan (interlocking token/font layer, not parallelizable). Verified: tsc + lint + build green; tokens confirmed present in the served stylesheet; landing/login render 200. Plan: `plans/reflow-completion-and-design.md`.
+
 ## 2026-07-20 — Phase 6 (voice, reflection, export; LLM provider swap)
 
 - **LLM provider: Anthropic → Google Gemini Flash** (founder decision — no paid APIs). AI Studio key, free tier, no card; covers parse-on-capture + reflections comfortably. Thin REST client (`app/llm/gemini.py`, httpx, no SDK), sampling-time `responseSchema` + Pydantic re-validation, key sent via `x-goog-api-key` header (never in URLs/logs). The `anthropic` dependency is fully removed; `GEMINI_API_KEY` + optional `GEMINI_MODEL` (default `gemini-2.5-flash`) replace `ANTHROPIC_API_KEY`/`PARSE_MODEL`. CLAUDE.md §3 table updated.
