@@ -134,6 +134,35 @@ body {
   }
 }
 
+@keyframes sweep-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* "Gentle Glide" (DESIGN §4): a re-flowed block slides to its new time;
+   blocks whose top/height don't change never move. Reduced-motion floor
+   above neutralizes the transition. */
+.timeline-block {
+  transition:
+    top var(--dur-flow) var(--ease-flow),
+    height var(--dur-flow) var(--ease-flow);
+}
+
+/* The now-line glides as time advances. */
+.now-line {
+  transition: top 700ms var(--ease-out);
+}
+
+/* The Big-3 win: an accent underline sweeps L→R, once. */
+.win-sweep {
+  transform-origin: left;
+  animation: sweep-x 520ms var(--ease-out) forwards;
+}
+
 /* Tabular figures — load-bearing so time labels never jitter. */
 .tabular {
   font-variant-numeric: tabular-nums;

@@ -2,6 +2,15 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-21 — Phase 12 (motion, finish & empty states)
+
+- **"Gentle Glide" re-flow motion** (DESIGN §4): timeline blocks carry a `.timeline-block` class transitioning `top`/`height` on the `--ease-flow` curve over `--dur-flow`, so a re-flowed block glides to its new time while blocks whose position didn't change never move ("what stayed, stayed"). Wildcards glide too; the now-line has its own gentle glide as time advances. The global `prefers-reduced-motion` rule neutralizes all of it.
+- **Flexible blocks got their DESIGN §5 treatment**: a hairline box + a 3px **accent left-rail** (active) / line rail (done), replacing the full ink outline — the accent now marks every flexible block. The now-line gained a small accent node at the gutter.
+- **Big-3 win** is now a moment: an accent underline **sweeps L→R once** (`win-sweep`/`sweep-x`) under a Fraunces "That's a win." The **date header** is now Fraunces display — warmth rationed to exactly the beats DESIGN names.
+- **Empty states** adopt the `EmptyState` component with warmer "Whisper & Settle" copy (inbox-zero → "Inbox clear. Nice.").
+- **Deferred (noted)**: the elaborate check-off tick-draw and a dismissible first-run onboarding whisper — the EmptyState copy carries first-run guidance for now; completion still reads via checkmark + strikethrough. Motion uses CSS transitions on `top` (cheap for <50 absolutely-positioned blocks) rather than a full transform-FLIP; revisit only if profiling shows jank.
+- Verified: tsc + lint + build green.
+
 ## 2026-07-21 — Phase 11 (mobile / PWA)
 
 - **Real app icon** — a "Warm Paper, One Flow" mark (sage flow-curve + now-node on a paper tile) as `public/icon.svg`, rasterized with `sharp` (bundled) to `icon-192/512.png`, a padded `icon-maskable-512.png`, plus `app/apple-icon.png` (180) and `app/icon.png` (32, modern favicon). The previously-referenced-but-missing PNGs now exist.

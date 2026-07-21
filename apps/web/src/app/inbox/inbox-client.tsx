@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { inboxTaskColumns, type InboxTask } from "@/lib/types";
 import { signOut } from "../login/actions";
 import { TaskEditSheet } from "./edit-sheet";
+import { EmptyState } from "@/components/ui/empty-state";
 
 function localToday(): string {
   const d = new Date();
@@ -312,9 +313,10 @@ export function InboxClient({
       </form>
 
       {tasks.length === 0 ? (
-        <p className="py-12 text-center text-sm text-faint">
-          Inbox zero. Nothing waiting on you here.
-        </p>
+        <EmptyState
+          title="Inbox clear. Nice."
+          hint="You're caught up — go do the day."
+        />
       ) : (
         <ul className="flex flex-col gap-2">
           {tasks.map((task, i) => (

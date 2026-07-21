@@ -824,7 +824,7 @@ export function TodayClient({
       <header className="flex items-baseline justify-between">
         <div>
           <span className="text-sm text-faint">Reflow</span>
-          <h1 className="text-2xl font-medium tracking-tight">{dateLabel}</h1>
+          <h1 className="font-display text-3xl tracking-tight text-ink">{dateLabel}</h1>
           {calendarConnected && lastSyncedAt && syncedLabel && (
             <p className="text-[11px] text-faint dark:text-faint">
               calendar synced · {syncedLabel}
@@ -938,8 +938,10 @@ export function TodayClient({
           </span>
         </div>
         {big3Done ? (
-          <div className="rounded-lg border border-accent-tint bg-accent-tint px-4 py-3 text-sm text-accent-text dark:border-accent-tint dark:bg-accent-tint dark:text-accent-text">
-            That&apos;s a win. Your Big 3 are done — everything else today is a bonus.
+          <div className="relative overflow-hidden rounded-lg border border-accent-tint bg-accent-tint px-4 py-3 text-sm text-accent-text">
+            <span className="font-display">That&apos;s a win.</span> Your Big 3 are
+            done — everything else today is a bonus.
+            <span className="win-sweep absolute inset-x-4 bottom-2 block h-px bg-accent" />
           </div>
         ) : null}
         {big3.length > 0 && (
@@ -1028,7 +1030,7 @@ export function TodayClient({
                   <div
                     key={`wc-${w.start}`}
                     aria-hidden
-                    className="pointer-events-none absolute left-14 right-0 overflow-hidden rounded-md border border-dashed border-accent bg-accent-tint px-3 py-1 dark:border-accent dark:bg-accent-tint"
+                    className="timeline-block pointer-events-none absolute left-14 right-0 overflow-hidden rounded-md border border-dashed border-accent bg-accent-tint px-3 py-1"
                     style={{
                       top: `${y(Math.max(start, dayStart))}px`,
                       height: `${Math.max((Math.min(end, dayEnd) - Math.max(start, dayStart)) * PX_PER_MIN, 20)}px`,
@@ -1071,10 +1073,10 @@ export function TodayClient({
                 <div
                   key={t.id}
                   className={cn(
-                    "group absolute left-14 right-0 overflow-hidden rounded-md border px-3 py-1",
+                    "timeline-block group absolute left-14 right-0 overflow-hidden rounded-md border border-l-[3px] px-3 py-1",
                     done
-                      ? "border-line bg-surface dark:border-line dark:bg-paper"
-                      : "border-ink bg-surface shadow-sm dark:border-ink dark:bg-surface",
+                      ? "border-line border-l-line bg-surface"
+                      : "border-line border-l-accent bg-surface shadow-sm",
                   )}
                   style={{
                     top: `${y(Math.max(start, dayStart))}px`,
@@ -1121,9 +1123,10 @@ export function TodayClient({
             {now >= dayStart && now <= dayEnd && (
               <div
                 aria-hidden
-                className="pointer-events-none absolute left-10 right-0 border-t border-accent"
+                className="now-line pointer-events-none absolute left-10 right-0 border-t border-accent"
                 style={{ top: `${y(now)}px` }}
               >
+                <span className="absolute -top-1 -left-1 h-2 w-2 rounded-full bg-accent" />
                 <span className="absolute -top-2 -left-10 text-[10px] text-accent">now</span>
               </div>
             )}
