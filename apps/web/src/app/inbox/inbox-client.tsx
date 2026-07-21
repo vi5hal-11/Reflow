@@ -34,7 +34,7 @@ type SpeechWindow = {
 
 function chip(text: string) {
   return (
-    <span className="rounded-full border border-neutral-200 px-2 py-0.5 text-xs text-neutral-500 dark:border-neutral-800">
+    <span className="rounded-full border border-line px-2 py-0.5 text-xs text-muted dark:border-line">
       {text}
     </span>
   );
@@ -248,12 +248,12 @@ export function InboxClient({
     <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-8 px-6 py-12">
       <header className="flex items-baseline justify-between">
         <div>
-          <Link href="/" className="text-sm text-neutral-400">
+          <Link href="/" className="text-sm text-faint">
             Reflow
           </Link>
           <h1 className="text-2xl font-medium tracking-tight">Inbox</h1>
         </div>
-        <div className="flex items-center gap-3 text-xs text-neutral-400">
+        <div className="flex items-center gap-3 text-xs text-faint">
           <span>
             {todayCount} for today · {laterCount} for later
           </span>
@@ -284,7 +284,7 @@ export function InboxClient({
               : "Dump anything — press / to focus, Enter to capture"
           }
           className={cn(
-            "w-full rounded-lg border border-neutral-300 bg-transparent px-4 py-3 text-base outline-none placeholder:text-neutral-400 focus:border-neutral-500 dark:border-neutral-700",
+            "w-full rounded-lg border border-line-strong bg-transparent px-4 py-3 text-base outline-none placeholder:text-faint focus:border-line-strong dark:border-line-strong",
             voiceSupported && "pr-11",
           )}
         />
@@ -297,8 +297,8 @@ export function InboxClient({
             className={cn(
               "absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-2",
               listening
-                ? "animate-pulse text-neutral-900 dark:text-neutral-100"
-                : "text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300",
+                ? "animate-pulse text-ink dark:text-ink"
+                : "text-faint hover:text-muted dark:hover:text-faint",
             )}
           >
             <Mic className="h-4 w-4" />
@@ -307,7 +307,7 @@ export function InboxClient({
       </form>
 
       {tasks.length === 0 ? (
-        <p className="py-12 text-center text-sm text-neutral-400">
+        <p className="py-12 text-center text-sm text-faint">
           Inbox zero. Nothing waiting on you here.
         </p>
       ) : (
@@ -317,7 +317,7 @@ export function InboxClient({
             {i === firstOldIndex && (
               <li
                 aria-hidden
-                className="pt-3 text-[11px] text-neutral-400"
+                className="pt-3 text-[11px] text-faint"
               >
                 from a while back — keep, schedule, or drop?
               </li>
@@ -327,15 +327,15 @@ export function InboxClient({
               className={cn(
                 "group flex items-center justify-between gap-3 rounded-lg border px-4 py-3",
                 i === selected
-                  ? "border-neutral-400 dark:border-neutral-500"
-                  : "border-neutral-200 dark:border-neutral-800",
+                  ? "border-accent dark:border-accent"
+                  : "border-line dark:border-line",
               )}
             >
               <div className="min-w-0">
                 <p className="truncate">{task.title}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   {parsing.has(task.id) && (
-                    <span className="text-xs text-neutral-400">thinking…</span>
+                    <span className="text-xs text-faint">thinking…</span>
                   )}
                   {task.estimated_minutes !== null && chip(`${task.estimated_minutes}m`)}
                   {task.energy_tag && chip(task.energy_tag)}
@@ -352,20 +352,20 @@ export function InboxClient({
               <div className="flex shrink-0 gap-1 text-xs">
                 <button
                   onClick={() => void triage(task, "today")}
-                  className="rounded-md bg-neutral-900 px-2.5 py-1.5 font-medium text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+                  className="rounded-md bg-accent px-2.5 py-1.5 font-medium text-paper hover:bg-accent-strong dark:bg-accent dark:text-paper dark:hover:bg-accent-strong"
                 >
                   Today
                 </button>
                 <button
                   onClick={() => void triage(task, "later")}
-                  className="rounded-md border border-neutral-300 px-2.5 py-1.5 hover:border-neutral-500 dark:border-neutral-700"
+                  className="rounded-md border border-line-strong px-2.5 py-1.5 hover:border-line-strong dark:border-line-strong"
                 >
                   Later
                 </button>
                 <button
                   onClick={() => void triage(task, "drop")}
                   aria-label="Drop"
-                  className="rounded-md px-2 py-1.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+                  className="rounded-md px-2 py-1.5 text-faint hover:text-ink dark:hover:text-faint"
                 >
                   ✕
                 </button>
@@ -376,7 +376,7 @@ export function InboxClient({
         </ul>
       )}
 
-      <p className="mt-auto text-center text-xs text-neutral-300 dark:text-neutral-600">
+      <p className="mt-auto text-center text-xs text-faint dark:text-faint">
         / capture · j/k move · t today · l later · x drop · export:{" "}
         <a href="/api/export?format=json" className="underline underline-offset-2">
           json

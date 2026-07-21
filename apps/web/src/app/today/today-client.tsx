@@ -809,8 +809,8 @@ export function TodayClient({
         title={full ? "Big 3 is full" : isIn ? "Remove from Big 3" : "Add to Big 3"}
         className={cn(
           "px-1 text-sm",
-          isIn ? "text-amber-500" : "text-neutral-300 hover:text-amber-400 dark:text-neutral-600",
-          full && "cursor-default opacity-40 hover:text-neutral-300",
+          isIn ? "text-accent" : "text-faint hover:text-accent dark:text-faint",
+          full && "cursor-default opacity-40 hover:text-faint",
           extraClass,
         )}
       >
@@ -823,19 +823,19 @@ export function TodayClient({
     <main className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col gap-6 px-6 py-10">
       <header className="flex items-baseline justify-between">
         <div>
-          <span className="text-sm text-neutral-400">Reflow</span>
+          <span className="text-sm text-faint">Reflow</span>
           <h1 className="text-2xl font-medium tracking-tight">{dateLabel}</h1>
           {calendarConnected && lastSyncedAt && syncedLabel && (
-            <p className="text-[11px] text-neutral-300 dark:text-neutral-600">
+            <p className="text-[11px] text-faint dark:text-faint">
               calendar synced · {syncedLabel}
             </p>
           )}
         </div>
-        <nav className="flex items-center gap-4 text-sm text-neutral-400">
+        <nav className="flex items-center gap-4 text-sm text-faint">
           {calendar.available && !calendar.connected && (
             <a
               href="/api/calendar/connect"
-              className="underline underline-offset-4 hover:text-neutral-600"
+              className="underline underline-offset-4 hover:text-muted"
             >
               connect Google Calendar
             </a>
@@ -851,19 +851,19 @@ export function TodayClient({
               <button
                 onClick={() => void syncCalendar(false)}
                 disabled={syncing}
-                className="underline underline-offset-4 hover:text-neutral-600 disabled:opacity-60"
+                className="underline underline-offset-4 hover:text-muted disabled:opacity-60"
               >
                 {syncing ? "syncing…" : "sync"}
               </button>
             </span>
           )}
-          <Link href="/inbox" className="underline underline-offset-4 hover:text-neutral-600">
+          <Link href="/inbox" className="underline underline-offset-4 hover:text-muted">
             Inbox
           </Link>
           <button
             onClick={() => void planDay(false)}
             disabled={planning}
-            className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-60 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+            className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-paper hover:bg-accent-strong disabled:opacity-60 dark:bg-accent dark:text-paper dark:hover:bg-accent-strong"
           >
             {planning ? "re-flowing…" : "Plan my day"}
           </button>
@@ -871,7 +871,7 @@ export function TodayClient({
       </header>
 
       {planNotice && (
-        <p className="rounded-lg border border-neutral-200 px-4 py-2 text-sm text-neutral-500 dark:border-neutral-800">
+        <p className="rounded-lg border border-line px-4 py-2 text-sm text-muted dark:border-line">
           {planNotice}
         </p>
       )}
@@ -879,7 +879,7 @@ export function TodayClient({
       {/* Momentum — dims, never resets (§7) */}
       <section aria-label="Momentum" className="space-y-2">
         {comebackGap !== null && (
-          <p className="rounded-lg border border-neutral-200 px-4 py-2 text-sm text-neutral-600 dark:border-neutral-800 dark:text-neutral-300">
+          <p className="rounded-lg border border-line px-4 py-2 text-sm text-muted dark:border-line dark:text-muted">
             welcome back — you&apos;ve shown up {active20} of the last {denom20}{" "}
             days. that counts.
           </p>
@@ -893,16 +893,16 @@ export function TodayClient({
                 className={cn(
                   "h-2 w-2 rounded-[3px]",
                   d.state === "active" &&
-                    "bg-neutral-700 dark:bg-neutral-200",
+                    "bg-ink dark:bg-ink",
                   d.state === "rest" &&
-                    "border border-neutral-300 bg-transparent dark:border-neutral-600",
-                  d.state === "none" && "bg-neutral-100 dark:bg-neutral-900",
-                  d.isToday && "ring-1 ring-neutral-400 ring-offset-1 dark:ring-neutral-500",
+                    "border border-line-strong bg-transparent dark:border-line-strong",
+                  d.state === "none" && "bg-line",
+                  d.isToday && "ring-1 ring-accent ring-offset-1 dark:ring-accent",
                 )}
               />
             ))}
           </div>
-          <span className="text-[11px] text-neutral-400">
+          <span className="text-[11px] text-faint">
             {active20} of the last {denom20} days
             {rest20 > 0 && ` · ${rest20} rest`}
           </span>
@@ -910,7 +910,7 @@ export function TodayClient({
       </section>
 
       {paddedTags.length > 0 && (
-        <p className="text-[11px] text-neutral-400">
+        <p className="text-[11px] text-faint">
           estimates padded from your history:{" "}
           {paddedTags
             .map(([tag, f]) => `${tag} +${Math.round((f - 1) * 100)}%`)
@@ -919,7 +919,7 @@ export function TodayClient({
       )}
 
       {calendarNotice && (
-        <p className="rounded-lg border border-neutral-200 px-4 py-2 text-sm text-neutral-500 dark:border-neutral-800">
+        <p className="rounded-lg border border-line px-4 py-2 text-sm text-muted dark:border-line">
           {calendarNotice}
         </p>
       )}
@@ -927,15 +927,15 @@ export function TodayClient({
       {/* Daily Big 3 — the day's definition of a win */}
       <section aria-label="Daily Big 3" className="space-y-2">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-sm font-medium text-neutral-500">Big 3</h2>
-          <span className="text-xs text-neutral-400">
+          <h2 className="text-sm font-medium text-muted">Big 3</h2>
+          <span className="text-xs text-faint">
             {big3.length === 0
               ? "star up to three tasks that would make today a win"
               : `${big3.filter((t) => t.status === "done").length} of ${big3.length} done`}
           </span>
         </div>
         {big3Done ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="rounded-lg border border-accent-tint bg-accent-tint px-4 py-3 text-sm text-accent-text dark:border-accent-tint dark:bg-accent-tint dark:text-accent-text">
             That&apos;s a win. Your Big 3 are done — everything else today is a bonus.
           </div>
         ) : null}
@@ -944,7 +944,7 @@ export function TodayClient({
             {big3.map((t) => (
               <li
                 key={t.id}
-                className="flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800"
+                className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm dark:border-line"
               >
                 <button
                   onClick={() => void toggleDone(t)}
@@ -952,13 +952,13 @@ export function TodayClient({
                   className={cn(
                     "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px]",
                     t.status === "done"
-                      ? "border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900"
-                      : "border-neutral-300 dark:border-neutral-600",
+                      ? "border-ink bg-ink text-paper"
+                      : "border-line-strong dark:border-line-strong",
                   )}
                 >
                   {t.status === "done" ? "✓" : ""}
                 </button>
-                <span className={cn("truncate", t.status === "done" && "text-neutral-400 line-through")}>
+                <span className={cn("truncate", t.status === "done" && "text-faint line-through")}>
                   {t.title}
                 </span>
                 {star(t, "ml-auto")}
@@ -978,10 +978,10 @@ export function TodayClient({
             {hourMarks.map((m) => (
               <div
                 key={m}
-                className="absolute left-0 right-0 border-t border-neutral-100 dark:border-neutral-900"
+                className="absolute left-0 right-0 border-t border-line dark:border-line"
                 style={{ top: `${y(m)}px` }}
               >
-                <span className="absolute -top-2 left-0 w-12 text-[11px] text-neutral-300 dark:text-neutral-600">
+                <span className="absolute -top-2 left-0 w-12 text-[11px] text-faint dark:text-faint">
                   {fmtClock(m)}
                 </span>
               </div>
@@ -1000,13 +1000,13 @@ export function TodayClient({
                   className={cn(
                     "absolute left-14 right-0 rounded-md border border-dashed",
                     clickable
-                      ? "cursor-pointer border-neutral-400 bg-neutral-50 dark:border-neutral-500 dark:bg-neutral-900"
+                      ? "cursor-pointer border-accent bg-surface dark:border-accent dark:bg-surface"
                       : "border-transparent",
                   )}
                   style={{ top: `${y(g.start)}px`, height: `${(g.end - g.start) * PX_PER_MIN}px` }}
                 >
                   {clickable && (
-                    <span className="absolute inset-0 flex items-center justify-center text-xs text-neutral-500">
+                    <span className="absolute inset-0 flex items-center justify-center text-xs text-muted">
                       place at {fmtClock(fitStart!)}
                     </span>
                   )}
@@ -1025,13 +1025,13 @@ export function TodayClient({
                   <div
                     key={`wc-${w.start}`}
                     aria-hidden
-                    className="pointer-events-none absolute left-14 right-0 overflow-hidden rounded-md border border-dashed border-amber-300/70 bg-amber-50/40 px-3 py-1 dark:border-amber-700/40 dark:bg-amber-950/20"
+                    className="pointer-events-none absolute left-14 right-0 overflow-hidden rounded-md border border-dashed border-accent bg-accent-tint px-3 py-1 dark:border-accent dark:bg-accent-tint"
                     style={{
                       top: `${y(Math.max(start, dayStart))}px`,
                       height: `${Math.max((Math.min(end, dayEnd) - Math.max(start, dayStart)) * PX_PER_MIN, 20)}px`,
                     }}
                   >
-                    <p className="truncate text-[11px] text-amber-600/80 dark:text-amber-400/70">
+                    <p className="truncate text-[11px] text-accent-text dark:text-accent-text">
                       wildcard · breathing room
                     </p>
                   </div>
@@ -1042,16 +1042,16 @@ export function TodayClient({
             {fixedBlocks.map((b) => (
               <div
                 key={b.key}
-                className="absolute left-14 right-0 overflow-hidden rounded-md border border-neutral-300 bg-neutral-100 px-3 py-1 dark:border-neutral-700 dark:bg-neutral-900"
+                className="absolute left-14 right-0 overflow-hidden rounded-md border border-line-strong bg-surface px-3 py-1 dark:border-line-strong dark:bg-surface"
                 style={{
                   top: `${y(Math.max(b.start, dayStart))}px`,
                   height: `${Math.max((Math.min(b.end, dayEnd) - Math.max(b.start, dayStart)) * PX_PER_MIN, 20)}px`,
                 }}
               >
-                <p className="truncate text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                <p className="truncate text-xs font-medium text-muted dark:text-muted">
                   {b.title}
                 </p>
-                <p className="text-[11px] text-neutral-400">
+                <p className="text-[11px] text-faint">
                   {fmtClock(b.start)}–{fmtClock(b.end)} · fixed
                 </p>
               </div>
@@ -1070,8 +1070,8 @@ export function TodayClient({
                   className={cn(
                     "group absolute left-14 right-0 overflow-hidden rounded-md border px-3 py-1",
                     done
-                      ? "border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950"
-                      : "border-neutral-900 bg-white shadow-sm dark:border-neutral-100 dark:bg-neutral-900",
+                      ? "border-line bg-surface dark:border-line dark:bg-paper"
+                      : "border-ink bg-surface shadow-sm dark:border-ink dark:bg-surface",
                   )}
                   style={{
                     top: `${y(Math.max(start, dayStart))}px`,
@@ -1082,16 +1082,16 @@ export function TodayClient({
                     <p
                       className={cn(
                         "truncate text-xs font-medium",
-                        done && "text-neutral-400 line-through",
+                        done && "text-faint line-through",
                       )}
                     >
-                      {big3Ids.includes(t.id) && <span className="text-amber-500">★ </span>}
+                      {big3Ids.includes(t.id) && <span className="text-accent">★ </span>}
                       {t.title}
                     </p>
                     <div className="flex shrink-0 gap-1 text-[11px] opacity-0 group-hover:opacity-100">
                       <button
                         onClick={() => void toggleDone(t)}
-                        className="rounded border border-neutral-300 px-1.5 hover:border-neutral-500 dark:border-neutral-600"
+                        className="rounded border border-line-strong px-1.5 hover:border-line-strong dark:border-line-strong"
                       >
                         {done ? "undo" : "done"}
                       </button>
@@ -1099,14 +1099,14 @@ export function TodayClient({
                         <button
                           onClick={() => void unschedule(t)}
                           title="Back to the tray — no harm done"
-                          className="rounded border border-neutral-300 px-1.5 text-neutral-400 hover:border-neutral-500 dark:border-neutral-600"
+                          className="rounded border border-line-strong px-1.5 text-faint hover:border-line-strong dark:border-line-strong"
                         >
                           unplace
                         </button>
                       )}
                     </div>
                   </div>
-                  <p className="text-[11px] text-neutral-400">
+                  <p className="text-[11px] text-faint">
                     {fmtClock(start)}–{fmtClock(end)}
                     {t.energy_tag ? ` · ${t.energy_tag}` : ""}
                   </p>
@@ -1118,10 +1118,10 @@ export function TodayClient({
             {now >= dayStart && now <= dayEnd && (
               <div
                 aria-hidden
-                className="pointer-events-none absolute left-10 right-0 border-t border-amber-400"
+                className="pointer-events-none absolute left-10 right-0 border-t border-accent"
                 style={{ top: `${y(now)}px` }}
               >
-                <span className="absolute -top-2 -left-10 text-[10px] text-amber-500">now</span>
+                <span className="absolute -top-2 -left-10 text-[10px] text-accent">now</span>
               </div>
             )}
           </div>
@@ -1129,15 +1129,15 @@ export function TodayClient({
 
         {/* Tray — today's tasks awaiting a slot */}
         <aside aria-label="To place" className="space-y-2">
-          <h2 className="text-sm font-medium text-neutral-500">To place</h2>
+          <h2 className="text-sm font-medium text-muted">To place</h2>
           {rolledCount > 0 && (
-            <p className="text-[11px] text-neutral-400">
+            <p className="text-[11px] text-faint">
               {rolledCount} rolled forward from before — fresh start, no
               baggage
             </p>
           )}
           {tray.length === 0 ? (
-            <p className="text-xs text-neutral-400">
+            <p className="text-xs text-faint">
               Nothing waiting. Triage the{" "}
               <Link href="/inbox" className="underline underline-offset-4">
                 inbox
@@ -1152,25 +1152,25 @@ export function TodayClient({
                   className={cn(
                     "rounded-lg border px-3 py-2 text-sm",
                     placingId === t.id
-                      ? "border-neutral-900 dark:border-neutral-100"
-                      : "border-neutral-200 dark:border-neutral-800",
+                      ? "border-ink dark:border-ink"
+                      : "border-line dark:border-line",
                   )}
                 >
                   <div className="flex items-center gap-1">
                     <span className="min-w-0 flex-1 truncate">{t.title}</span>
                     {t.status === "rolled" && (
-                      <span className="shrink-0 rounded-full border border-neutral-200 px-1.5 py-0.5 text-[10px] text-neutral-400 dark:border-neutral-800">
+                      <span className="shrink-0 rounded-full border border-line px-1.5 py-0.5 text-[10px] text-faint dark:border-line">
                         rolled
                       </span>
                     )}
                     {star(t)}
                   </div>
                   {overflowIds.has(t.id) && (
-                    <p className="mt-1 text-[11px] text-neutral-400">
+                    <p className="mt-1 text-[11px] text-faint">
                       didn&apos;t fit today — it can wait, no harm done
                     </p>
                   )}
-                  <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-neutral-400">
+                  <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-faint">
                     <span>{t.estimated_minutes ?? DEFAULT_TASK_MINUTES}m</span>
                     {t.energy_tag && <span>· {t.energy_tag}</span>}
                     <span className="ml-auto flex gap-1">
@@ -1179,22 +1179,22 @@ export function TodayClient({
                         className={cn(
                           "rounded border px-1.5 py-0.5",
                           placingId === t.id
-                            ? "border-neutral-900 font-medium dark:border-neutral-100"
-                            : "border-neutral-300 hover:border-neutral-500 dark:border-neutral-600",
+                            ? "border-ink font-medium dark:border-ink"
+                            : "border-line-strong hover:border-line-strong dark:border-line-strong",
                         )}
                       >
                         {placingId === t.id ? "pick a gap…" : "place"}
                       </button>
                       <button
                         onClick={() => void toggleDone(t)}
-                        className="rounded border border-neutral-300 px-1.5 py-0.5 hover:border-neutral-500 dark:border-neutral-600"
+                        className="rounded border border-line-strong px-1.5 py-0.5 hover:border-line-strong dark:border-line-strong"
                       >
                         done
                       </button>
                       <button
                         onClick={() => void moveToLater(t)}
                         title="Move to Later — it'll be there when you want it"
-                        className="rounded border border-neutral-300 px-1.5 py-0.5 text-neutral-400 hover:border-neutral-500 dark:border-neutral-600"
+                        className="rounded border border-line-strong px-1.5 py-0.5 text-faint hover:border-line-strong dark:border-line-strong"
                       >
                         later
                       </button>
@@ -1202,7 +1202,7 @@ export function TodayClient({
                         <button
                           onClick={() => void moveToTomorrow(t)}
                           title="Roll to tomorrow — it'll be first in line"
-                          className="rounded border border-neutral-300 px-1.5 py-0.5 text-neutral-400 hover:border-neutral-500 dark:border-neutral-600"
+                          className="rounded border border-line-strong px-1.5 py-0.5 text-faint hover:border-line-strong dark:border-line-strong"
                         >
                           tomorrow
                         </button>
@@ -1219,7 +1219,7 @@ export function TodayClient({
               {doneUnplaced.map((t) => (
                 <li
                   key={t.id}
-                  className="flex items-center gap-2 px-1 text-xs text-neutral-400"
+                  className="flex items-center gap-2 px-1 text-xs text-faint"
                 >
                   <span>✓</span>
                   <span className="truncate line-through">{t.title}</span>
@@ -1235,9 +1235,9 @@ export function TodayClient({
           )}
 
           {placingTask && (
-            <p className="text-[11px] leading-relaxed text-neutral-400">
+            <p className="text-[11px] leading-relaxed text-faint">
               Click a highlighted gap on the timeline to schedule{" "}
-              <span className="font-medium text-neutral-500">{placingTask.title}</span> (
+              <span className="font-medium text-muted">{placingTask.title}</span> (
               {placingMinutes}m).{" "}
               <button className="underline underline-offset-2" onClick={() => setPlacingId(null)}>
                 cancel
@@ -1251,36 +1251,36 @@ export function TodayClient({
       {(eveningReached || reflection) && (
         <section aria-label="Reflection" className="space-y-2">
           {reflection ? (
-            <div className="space-y-1.5 rounded-lg border border-neutral-200 px-4 py-3 text-sm dark:border-neutral-800">
+            <div className="space-y-1.5 rounded-lg border border-line px-4 py-3 text-sm dark:border-line">
               <p>{reflection.insight}</p>
               {reflection.pattern && (
-                <p className="text-neutral-500">{reflection.pattern}</p>
+                <p className="text-muted">{reflection.pattern}</p>
               )}
-              <p className="text-neutral-400">{reflection.encouragement}</p>
+              <p className="text-faint">{reflection.encouragement}</p>
             </div>
           ) : (
             <div className="text-center">
               <button
                 onClick={() => void reflect()}
                 disabled={reflecting}
-                className="text-xs text-neutral-400 underline underline-offset-4 hover:text-neutral-600 disabled:opacity-60"
+                className="text-xs text-faint underline underline-offset-4 hover:text-muted disabled:opacity-60"
               >
                 {reflecting ? "looking back…" : "close the day — a short reflection"}
               </button>
             </div>
           )}
           {reflectNotice && (
-            <p className="text-center text-xs text-neutral-400">{reflectNotice}</p>
+            <p className="text-center text-xs text-faint">{reflectNotice}</p>
           )}
         </section>
       )}
 
-      <p className="mt-auto pt-6 text-center text-xs text-neutral-300 dark:text-neutral-600">
+      <p className="mt-auto pt-6 text-center text-xs text-faint dark:text-faint">
         plan my day re-flows around what&apos;s fixed · placing by hand always works
         {" · "}
         <button
           onClick={() => void toggleRestDay()}
-          className="underline underline-offset-2 hover:text-neutral-500"
+          className="underline underline-offset-2 hover:text-muted"
         >
           {todayIsRest ? "rest day ✓ — undo" : "mark today a rest day"}
         </button>
@@ -1289,7 +1289,7 @@ export function TodayClient({
             {" · "}
             <button
               onClick={() => void disconnectCalendar()}
-              className="underline underline-offset-2 hover:text-neutral-500"
+              className="underline underline-offset-2 hover:text-muted"
             >
               disconnect calendar
             </button>

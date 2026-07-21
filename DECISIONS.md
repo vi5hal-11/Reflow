@@ -2,6 +2,14 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-21 — Phase 8 (component & interaction system + screen migration)
+
+- **Component library** on the tokens (`src/components/ui/`): `Chip` (default/accent), `Button` (primary=accent / quiet / ghost, ≥44px touch on md), `SectionHeader`, `EmptyState` ("Whisper & Settle" one-line + quiet action), and a dependency-free `Toast` (`ToastProvider` + `useToast`) mounted once via `src/app/providers.tsx` in the root layout. Toast is calm by policy (no red, auto-dismiss, dismissible) and safe-area aware.
+- **Full color migration of `today` + `inbox`** off `neutral-*`/`amber-*` onto theme-adaptive tokens (`text-ink/muted/faint`, `border-line/-strong`, `bg-surface/paper`, `bg-accent`, `text-accent-text`) — verified zero raw color classes remain. Two fills handled deliberately, *against* a blanket map: the **done-checkbox stays ink** (DESIGN forbids hue-signalling completion — sage already means "flow") and the **momentum "miss" dot became a calm `bg-line` gap**, not an accent.
+- **Semantic recolor to "one flow"**: every amber now-line, Big-3 star, wildcard lane, and win-banner tint became the single **sage accent** — so the accent literally threads the whole day. This is the visible identity landing in the core screens.
+- **Scope call**: the two big client screens were *tokenized* (local `chip()` helpers retained, now token-based) rather than fully re-plumbed through the new components — the components exist for Phases 9–12 to compose against, and re-plumbing 1300 lines of working scheduler UI for zero behavior change wasn't worth the regression risk. Deeper adoption folds into Phase 12 polish. Radii: `--radius-lg` now 16px, `--radius`/`--radius-sm` set; `rounded-md` keeps its default (harmonized in Phase 12).
+- Verified: tsc + lint + build green; provider tree smoke-tested (home/login 200, today/inbox auth-redirect). Inline per plan.
+
 ## 2026-07-21 — Phase 7 (design foundation) + design identity locked
 
 - **Identity "Warm Paper, One Flow"** chosen via an 8-agent research workflow (inspiration galleries + real planner products + motion/color/PWA articles) → benchmark scoring → founder picked all 8 recommended options. Full spec: `apps/web/src/app/DESIGN.md`. Accent = eucalyptus/sage `#6E9A78`/`#8CBE97` (the single "flow" color); Geist (UI, tabular) + Fraunces (display, rationed); warm paper `#FAF8F2` / warm ink `#2C2B27`, warm-charcoal dark peer `#16181A`, light default; 12px soft-calm flat feel; "Gentle Glide" ease-in-out FLIP motion; single-spine timeline; persistent-capture-pill + 2-tab mobile shell; "Whisper & Settle" + Daily-Arc emotional layer.
