@@ -2,6 +2,14 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-21 — Phases 13 + 14 (inline prep; human/account steps remain with the founder)
+
+Phases 13 (human walkthrough) and 14 (deploy) are gated on the founder — a signed-in session, hosting accounts, and secret rotation aren't something the build agent can do. All the *inline* prep is done:
+
+- **E2E scaffold**: `@playwright/test` added (lockfile updated so CI `npm ci` stays green), `playwright.config.ts` (desktop + Pixel-7 projects, auto web server), and `e2e/smoke.spec.ts` — a **no-auth CI-safe slice**: landing identity, login reachable, protected routes redirect, manifest advertises share_target + icons, and no horizontal scroll at 375px. `npm run test:e2e` runs it after `npx playwright install`. Signed-in flows need a seeded test user (documented) and are deliberately a later project, not wired as a blocking CI gate I can't verify here.
+- **Deploy artifacts**: `services/scheduler/Dockerfile` (+ `.dockerignore`) — validated by building a non-editable wheel (`pip install .` will succeed). `DEPLOY.md` — exact Vercel + Railway/Fly + Supabase steps, env tables, prod OAuth redirects, and the secret-rotation checklist. `apps/web/WALKTHROUGH.md` — the founder's signed-in checklist proving the §12 60-second promise.
+- **What remains (founder)**: run the walkthrough; create Vercel + Railway/Fly projects with the env from DEPLOY.md; register prod OAuth redirects; rotate the three chat-transited secrets; run Supabase advisors. Everything else is built and green.
+
 ## 2026-07-21 — Phase 12 (motion, finish & empty states)
 
 - **"Gentle Glide" re-flow motion** (DESIGN §4): timeline blocks carry a `.timeline-block` class transitioning `top`/`height` on the `--ease-flow` curve over `--dur-flow`, so a re-flowed block glides to its new time while blocks whose position didn't change never move ("what stayed, stayed"). Wildcards glide too; the now-line has its own gentle glide as time advances. The global `prefers-reduced-motion` rule neutralizes all of it.

@@ -21,3 +21,8 @@ dist/
 .pytest_cache/
 .ruff_cache/
 *.tsbuildinfo
+
+# playwright
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/.playwright/
