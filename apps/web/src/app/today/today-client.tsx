@@ -860,6 +860,9 @@ export function TodayClient({
           <Link href="/inbox" className="underline underline-offset-4 hover:text-muted">
             Inbox
           </Link>
+          <Link href="/settings" className="underline underline-offset-4 hover:text-muted">
+            Settings
+          </Link>
           <button
             onClick={() => void planDay(false)}
             disabled={planning}

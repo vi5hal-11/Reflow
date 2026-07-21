@@ -2,6 +2,14 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-21 — Phase 9 (settings & profile UI — the biggest functional gap)
+
+- **`/settings`** (server page + client) finally lets users write what the scheduler already reads: display name, timezone, working-hours window, default buffer, and the **energy profile**. Until now these sat at DB defaults, so "energy-aware scheduling" was unpersonalized — this unlocks the core promise.
+- **Energy editor** (the marquee control): a paint-to-tag hour grid scoped to the working window. Pick a brush (Deep / Shallow / Admin / Clear) then tap or drag across hours — pointer-based painting for touch + mouse, and each cell is a real `<button>` so click/keyboard applies the brush (WCAG 2.5.7 non-drag alternative satisfied). Tags are distinguished by **fill weight, not just hue** (deep = accent fill, shallow = accent-tint, admin = outline) so they're discriminable without color. Serializes to/from the `energy_profile` jsonb "HH:00-HH:00" ranges; grid re-scopes when working hours change.
+- **Calendar + Data** moved into settings as their proper home: connect (GET redirect) / disconnect (client fetch → reload) using the existing endpoints; JSON + iCal export links. The contextual affordances on `/today` stay too (harmless, and connect-in-context is good UX).
+- Optimistic save writes the whole profile in one `profiles` update (RLS-scoped to the caller's row) with a calm toast; a sticky save bar sits above the safe-area inset. Settings links added to the today + inbox headers.
+- Verified: tsc + lint + build green. Inline per plan.
+
 ## 2026-07-21 — Phase 8 (component & interaction system + screen migration)
 
 - **Component library** on the tokens (`src/components/ui/`): `Chip` (default/accent), `Button` (primary=accent / quiet / ghost, ≥44px touch on md), `SectionHeader`, `EmptyState` ("Whisper & Settle" one-line + quiet action), and a dependency-free `Toast` (`ToastProvider` + `useToast`) mounted once via `src/app/providers.tsx` in the root layout. Toast is calm by policy (no red, auto-dismiss, dismissible) and safe-area aware.

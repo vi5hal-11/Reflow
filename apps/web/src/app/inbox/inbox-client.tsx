@@ -260,6 +260,9 @@ export function InboxClient({
           <Link href="/today" className="underline underline-offset-4">
             today
           </Link>
+          <Link href="/settings" className="underline underline-offset-4">
+            settings
+          </Link>
           <form action={signOut}>
             <button className="underline underline-offset-4">sign out</button>
           </form>
