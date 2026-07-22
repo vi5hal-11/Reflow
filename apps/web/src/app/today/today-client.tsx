@@ -11,6 +11,7 @@ import { Check } from "lucide-react";
 import { ENERGY, EnergyDot } from "@/components/ui/energy";
 import { Meter, Ring } from "@/components/ui/ring";
 import { SunHorizon } from "@/components/ui/sun-horizon";
+import { Welcome } from "@/components/onboarding/welcome";
 import type { CalendarStatus, CalendarSyncResult } from "@/lib/calendar/types";
 import {
   energyTags,
@@ -922,6 +923,8 @@ export function TodayClient({
       </header>
 
       <CommandBar />
+
+      <Welcome />
 
       {dayTotal > 0 && (
         <section
