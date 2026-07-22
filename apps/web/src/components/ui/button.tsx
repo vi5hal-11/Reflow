@@ -8,10 +8,10 @@ type Size = "sm" | "md";
 // action — Plan my day, Sign in); `quiet` is a bordered secondary; `ghost` is
 // a low-emphasis text action. Comfortable touch targets by default (≥44px on md).
 const base =
-  "inline-flex items-center justify-center gap-1.5 rounded-sm font-medium transition-colors disabled:cursor-default disabled:opacity-60";
+  "press inline-flex items-center justify-center gap-1.5 rounded-sm font-medium transition-colors disabled:cursor-default disabled:opacity-60 disabled:active:scale-100";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-accent text-paper hover:bg-accent-strong",
+  primary: "bg-accent text-paper shadow-[var(--shadow-soft)] hover:bg-accent-strong",
   quiet: "border border-line-strong text-ink hover:border-accent",
   ghost: "text-muted hover:text-ink",
 };

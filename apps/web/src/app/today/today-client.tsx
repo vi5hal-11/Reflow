@@ -1181,7 +1181,7 @@ export function TodayClient({
                 <li
                   key={t.id}
                   className={cn(
-                    "rounded-lg border px-3 py-2 text-sm",
+                    "lift rounded-lg border px-3 py-2 text-sm",
                     placingId === t.id
                       ? "border-ink dark:border-ink"
                       : "border-line dark:border-line",

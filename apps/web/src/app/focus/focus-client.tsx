@@ -178,7 +178,7 @@ export function FocusClient({
 
       <section
         aria-label="Current task"
-        className="rounded-lg border border-line bg-surface p-6 shadow-sm"
+        className="rounded-lg border border-line bg-surface p-6 shadow-[var(--shadow-soft)]"
       >
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-xl font-medium text-ink">

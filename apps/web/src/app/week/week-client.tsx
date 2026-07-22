@@ -78,7 +78,7 @@ export function WeekClient({ tasks }: { tasks: DayTask[] }) {
             <section
               key={key}
               className={cn(
-                "flex flex-col gap-2 rounded-lg border p-3",
+                "lift flex flex-col gap-2 rounded-lg border p-3",
                 isToday ? "border-accent" : "border-line",
               )}
             >

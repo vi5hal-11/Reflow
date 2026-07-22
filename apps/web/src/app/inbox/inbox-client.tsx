@@ -420,7 +420,7 @@ export function InboxClient({
             <li
               onClick={() => setSelected(i)}
               className={cn(
-                "group flex items-center justify-between gap-3 rounded-lg border px-4 py-3 transition-colors",
+                "lift group flex items-center justify-between gap-3 rounded-lg border px-4 py-3 transition-colors",
                 picked.has(task.id)
                   ? "border-accent bg-accent-tint/40"
                   : i === selected
