@@ -8,6 +8,7 @@ import { CommandBar } from "@/components/command/command-trigger";
 import { ViewSwitcher } from "@/components/app-shell/view-switcher";
 import { nextRecurringInsert } from "@/lib/recurrence";
 import { ENERGY, EnergyDot } from "@/components/ui/energy";
+import { Meter, Ring } from "@/components/ui/ring";
 import type { CalendarStatus, CalendarSyncResult } from "@/lib/calendar/types";
 import {
   energyTags,
@@ -734,6 +735,31 @@ export function TodayClient({
     ([, f]) => f > 1.05,
   );
 
+  // Day at a glance (v3): completion ring + a gentle workload meter.
+  const dayFlexible = tasks.filter(
+    (t) =>
+      !t.is_fixed &&
+      (t.status === "todo" ||
+        t.status === "rolled" ||
+        t.status === "scheduled" ||
+        t.status === "done") &&
+      (t.planned_date === today ||
+        (t.scheduled_start && isLocalToday(t.scheduled_start))),
+  );
+  const dayTotal = dayFlexible.length;
+  const dayDone = dayFlexible.filter((t) => t.status === "done").length;
+  const fixedMins = fixedBlocks.reduce(
+    (s, b) => s + Math.max(0, Math.min(b.end, dayEnd) - Math.max(b.start, dayStart)),
+    0,
+  );
+  const availableMins = Math.max(60, dayEnd - dayStart - fixedMins);
+  const scheduledMins = dayFlexible
+    .filter((t) => t.status !== "done")
+    .reduce((s, t) => s + (t.estimated_minutes ?? DEFAULT_TASK_MINUTES), 0);
+  const workload = scheduledMins / availableMins;
+  const workloadLabel =
+    workload > 1 ? "a bit full" : workload > 0.75 ? "nicely full" : "room to breathe";
+
   // End-of-day reflection (§9 Phase 6): summarize the day the client already
   // holds and let the LLM edge find one kind, specific observation.
   const reflect = useCallback(async () => {
@@ -894,6 +920,24 @@ export function TodayClient({
       </header>
 
       <CommandBar />
+
+      {dayTotal > 0 && (
+        <section
+          aria-label="Day at a glance"
+          className="flex items-center gap-4 rounded-lg border border-line px-4 py-3"
+        >
+          <Ring value={dayTotal ? dayDone / dayTotal : 0} size={48}>
+            {dayDone}/{dayTotal}
+          </Ring>
+          <div className="min-w-0 flex-1">
+            <div className="mb-1 flex items-baseline justify-between text-xs text-muted">
+              <span>Today&apos;s load</span>
+              <span className="text-faint">{workloadLabel}</span>
+            </div>
+            <Meter value={workload} />
+          </div>
+        </section>
+      )}
 
       {planNotice && (
         <p className="rounded-lg border border-line px-4 py-2 text-sm text-muted dark:border-line">

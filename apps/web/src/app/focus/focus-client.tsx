@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ViewSwitcher } from "@/components/app-shell/view-switcher";
 import { CommandBar } from "@/components/command/command-trigger";
+import { Ring } from "@/components/ui/ring";
 import { useToast } from "@/components/ui/toast";
 import { nextRecurringInsert } from "@/lib/recurrence";
 import type { DayTask } from "@/lib/types";
@@ -172,9 +173,14 @@ export function FocusClient({
       {header}
       <CommandBar />
 
-      <p className="text-sm text-muted">
-        {started ? "Now" : "Up next"} · {doneCount} of {todays.length} done today
-      </p>
+      <div className="flex items-center gap-3">
+        <Ring value={todays.length ? doneCount / todays.length : 0} size={40} stroke={4}>
+          {doneCount}/{todays.length}
+        </Ring>
+        <p className="text-sm text-muted">
+          {started ? "In progress" : "Up next"} · {doneCount} of {todays.length} done today
+        </p>
+      </div>
 
       <section
         aria-label="Current task"
