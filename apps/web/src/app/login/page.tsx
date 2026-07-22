@@ -91,7 +91,7 @@ export default async function LoginPage({
         <div className="flex gap-2">
           <button
             formAction={signInWithPassword}
-            className="press flex-1 rounded-sm bg-accent px-3 py-2.5 text-sm font-medium text-paper shadow-[var(--shadow-soft)] transition-colors hover:bg-accent-strong"
+            className="press flex-1 rounded-sm border border-accent-strong bg-accent px-3 py-2.5 text-sm font-medium text-paper shadow-[var(--shadow-soft)] transition-colors hover:bg-accent-strong"
           >
             Sign in
           </button>

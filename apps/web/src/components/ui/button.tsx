@@ -11,8 +11,9 @@ const base =
   "press inline-flex items-center justify-center gap-1.5 rounded-sm font-medium transition-colors disabled:cursor-default disabled:opacity-60 disabled:active:scale-100";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-accent text-paper shadow-[var(--shadow-soft)] hover:bg-accent-strong",
-  quiet: "border border-line-strong text-ink hover:border-accent",
+  primary:
+    "border border-accent-strong bg-accent text-paper shadow-[var(--shadow-soft)] hover:bg-accent-strong",
+  quiet: "border border-line-strong text-ink hover:border-accent hover:bg-accent-tint/40",
   ghost: "text-muted hover:text-ink",
 };
 

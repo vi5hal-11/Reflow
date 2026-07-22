@@ -108,7 +108,7 @@ export default function Home() {
           <div className="flex flex-wrap items-center gap-4">
             <Link
               href="/login"
-              className="press rounded-sm bg-accent px-5 py-2.5 text-sm font-medium text-paper shadow-[var(--shadow-soft)] transition-colors hover:bg-accent-strong"
+              className="press rounded-sm border border-accent-strong bg-accent px-5 py-2.5 text-sm font-medium text-paper shadow-[var(--shadow-soft)] transition-colors hover:bg-accent-strong"
             >
               Start the day
             </Link>
@@ -186,7 +186,7 @@ export default function Home() {
         </p>
         <Link
           href="/login"
-          className="press mt-6 inline-block rounded-sm bg-accent px-5 py-2.5 text-sm font-medium text-paper shadow-[var(--shadow-soft)] transition-colors hover:bg-accent-strong"
+          className="press mt-6 inline-block rounded-sm border border-accent-strong bg-accent px-5 py-2.5 text-sm font-medium text-paper shadow-[var(--shadow-soft)] transition-colors hover:bg-accent-strong"
         >
           Start the day
         </Link>
