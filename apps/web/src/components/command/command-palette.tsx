@@ -105,6 +105,7 @@ export function CommandPalette() {
   const actions: Action[] = useMemo(
     () => [
       { id: "today", label: "Go to Today", keywords: "day plan timeline", run: () => { close(); router.push("/today"); } },
+      { id: "focus", label: "Enter Focus", keywords: "execute now one thing timer", run: () => { close(); router.push("/focus"); } },
       { id: "inbox", label: "Go to Inbox", keywords: "capture triage", run: () => { close(); router.push("/inbox"); } },
       { id: "settings", label: "Go to Settings", keywords: "profile energy hours", run: () => { close(); router.push("/settings"); } },
       { id: "plan", label: "Plan my day", keywords: "schedule reflow auto", run: () => { close(); router.push("/today?plan=1"); } },

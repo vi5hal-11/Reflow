@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { CommandBar } from "@/components/command/command-trigger";
+import { ViewSwitcher } from "@/components/app-shell/view-switcher";
 import type { CalendarStatus, CalendarSyncResult } from "@/lib/calendar/types";
 import {
   energyTags,
@@ -842,7 +843,8 @@ export function TodayClient({
             </p>
           )}
         </div>
-        <nav className="flex items-center gap-4 text-sm text-faint">
+        <nav className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 text-sm text-faint">
+          <ViewSwitcher />
           {calendar.available && !calendar.connected && (
             <a
               href="/api/calendar/connect"

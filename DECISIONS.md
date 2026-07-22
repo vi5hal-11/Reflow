@@ -6,6 +6,11 @@ Running log of implementation decisions that deviate from or refine CLAUDE.md. N
 
 A competitor-research workflow was launched (deep-research + market-research across Sunsama/Motion/Akiflow/Amie/Reclaim/Todoist/Linear/…) but died on the session usage limit before returning; the founder's directional picks came through first and drive the build. **Selected:** ⌘K command palette · drag-to-reschedule · inline editing · multi-select+bulk+undo · recurring tasks · subtasks · reminders · focus mode · startup/shutdown rituals · week view · NL quick-add · and the control vocabulary (command bar, contextual toolbar, segmented view-switcher, icon buttons + context menus). Built inline in committed increments (workflows keep hitting the limit); full v2 plan lives in the todo/roadmap.
 
+### v2-2 — View-switcher restructure + Focus/execution mode
+- `components/app-shell/view-switcher.tsx`: a segmented control (Today · Focus now; Week added in v2-3) — the plan is now one thing with **modes**, not scattered screens. Added to the today header; the palette gained an "Enter Focus" action.
+- `/focus` (`focus-client.tsx`): **execution mode** — operates on today's scheduled flexible blocks, surfaces the current (in-progress, else next) block as a big card with a live time-remaining, progress bar, and a **Done→advance** flow; shows "next up" and a done-count. Empty state routes to Plan my day. Completion marks done + bumps momentum (kept lean vs today's fuller recordCompletion). This is the "turn plan into do" restructure.
+- Verified: tsc + lint + build green (`/focus` route emitted).
+
 ### v2-1 — Command spine (⌘K palette + NL quick-add + command bar)
 - `components/command/command-palette.tsx`: a global ⌘K / Ctrl-K menu (also opened by a dispatched `reflow:cmdk` event) — fuzzy-filtered actions (Today, Inbox, Settings, Plan my day, Export) with full keyboard nav (↑↓/↵/esc), and **natural-language quick-add**: any typed text offers "Add …" which captures a task and fires the existing `/parse` edge (reuses the capture pattern, no new backend). Mounted once in `providers.tsx`.
 - `components/command/command-trigger.tsx`: the visible **command bar** (`CommandBar`) + an icon trigger — the app's new spine and the touch/mobile way in. Placed under the today header and the inbox omnibox.
