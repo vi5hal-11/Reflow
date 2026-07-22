@@ -17,6 +17,7 @@ import {
   habitIcon,
   type HabitColor,
 } from "@/components/habits/habit-meta";
+import { MoodCheckin } from "@/components/habits/mood-checkin";
 
 export type Habit = {
   id: string;
@@ -33,10 +34,13 @@ export type HabitLog = { habit_id: string; log_date: string; minutes: number | n
 function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-function lastNDays(n: number): string[] {
-  const out: string[] = [];
-  const d = new Date();
+// N days ending at `end` (a YYYY-MM-DD string) — parsed at local noon so the
+// day-stepping never trips over a DST or timezone boundary.
+function lastNDays(n: number, end: string): string[] {
+  const [y, m, day] = end.split("-").map(Number);
+  const d = new Date(y, m - 1, day, 12);
   d.setDate(d.getDate() - (n - 1));
+  const out: string[] = [];
   for (let i = 0; i < n; i++) {
     out.push(ymd(d));
     d.setDate(d.getDate() + 1);
@@ -48,17 +52,22 @@ const GRID_DAYS = 14;
 
 export function HabitsClient({
   userId,
+  today,
   initialHabits,
   initialLogs,
+  initialMood,
+  initialMoodNote,
 }: {
   userId: string;
+  today: string;
   initialHabits: Habit[];
   initialLogs: HabitLog[];
+  initialMood: number | null;
+  initialMoodNote: string | null;
 }) {
   const supabase = createClient();
   const toast = useToast();
-  const today = ymd(new Date());
-  const days = useMemo(() => lastNDays(GRID_DAYS), []);
+  const days = useMemo(() => lastNDays(GRID_DAYS, today), [today]);
 
   const [habits, setHabits] = useState<Habit[]>(initialHabits);
   const [logged, setLogged] = useState<Set<string>>(
@@ -129,6 +138,13 @@ export function HabitsClient({
           </Button>
         </div>
       </header>
+
+      <MoodCheckin
+        userId={userId}
+        today={today}
+        initialMood={initialMood}
+        initialNote={initialMoodNote}
+      />
 
       <p className="text-sm text-muted">
         Show up when you can. The grid fills as you do — it dims on a quiet day,

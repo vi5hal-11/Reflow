@@ -15,7 +15,10 @@ export default async function HabitsPage() {
   since.setDate(since.getDate() - 20);
   const sinceStr = `${since.getFullYear()}-${String(since.getMonth() + 1).padStart(2, "0")}-${String(since.getDate()).padStart(2, "0")}`;
 
-  const [{ data: habits }, { data: logs }] = await Promise.all([
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  const [{ data: habits }, { data: logs }, { data: mood }] = await Promise.all([
     supabase
       .from("habits")
       .select("id, title, icon, color, kind, cadence, target_per_week, position")
@@ -26,13 +29,21 @@ export default async function HabitsPage() {
       .from("habit_logs")
       .select("habit_id, log_date, minutes")
       .gte("log_date", sinceStr),
+    supabase
+      .from("mood_logs")
+      .select("mood, note")
+      .eq("log_date", todayStr)
+      .maybeSingle(),
   ]);
 
   return (
     <HabitsClient
       userId={user.id}
+      today={todayStr}
       initialHabits={(habits ?? []) as Habit[]}
       initialLogs={(logs ?? []) as HabitLog[]}
+      initialMood={mood?.mood ?? null}
+      initialMoodNote={mood?.note ?? null}
     />
   );
 }
