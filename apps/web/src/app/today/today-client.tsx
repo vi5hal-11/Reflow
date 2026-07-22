@@ -124,6 +124,15 @@ export function TodayClient({
   const [big3Ids, setBig3Ids] = useState<string[]>(initialBig3Ids);
   const [placingId, setPlacingId] = useState<string | null>(null);
   const [now, setNow] = useState(nowMinutes);
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState<{
+    id: string;
+    durMin: number;
+    grabOffsetMin: number;
+    startMin: number;
+  } | null>(null);
+  const [dragStart, setDragStart] = useState<number | null>(null);
+  const dragStartRef = useRef<number | null>(null);
   const [wildcards, setWildcards] = useState<PlanWildcard[]>([]);
   const [overflowIds, setOverflowIds] = useState<Set<string>>(new Set());
   const [planning, setPlanning] = useState(false);
@@ -831,6 +840,57 @@ export function TodayClient({
 
   const eveningReached = now >= dayEnd - 60;
 
+  // Drag-to-reschedule: grab a placed block, drop it at a new time (snapped to
+  // 5 min). A manual override — no re-flow after, and a no-move tap is a no-op.
+  // Fallback for touch/keyboard is the existing place/unplace flow (WCAG 2.5.7).
+  const beginDrag = useCallback(
+    (e: React.PointerEvent, t: DayTask) => {
+      if (t.status === "done" || !t.scheduled_start) return;
+      const rect = timelineRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const s = toMinutes(t.scheduled_start);
+      const en = t.scheduled_end ? toMinutes(t.scheduled_end) : s + DEFAULT_TASK_MINUTES;
+      const pointerMin = (e.clientY - rect.top) / PX_PER_MIN + dayStart;
+      dragStartRef.current = s;
+      setDragStart(s);
+      setDrag({ id: t.id, durMin: en - s, grabOffsetMin: pointerMin - s, startMin: s });
+    },
+    [dayStart],
+  );
+
+  useEffect(() => {
+    if (!drag) return;
+    const onMove = (e: PointerEvent) => {
+      const rect = timelineRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const pointerMin = (e.clientY - rect.top) / PX_PER_MIN + dayStart;
+      let s = Math.round((pointerMin - drag.grabOffsetMin) / 5) * 5;
+      s = Math.max(dayStart, Math.min(s, dayEnd - drag.durMin));
+      dragStartRef.current = s;
+      setDragStart(s);
+    };
+    const onUp = () => {
+      const s = dragStartRef.current;
+      if (s != null && s !== drag.startMin) {
+        const scheduled_start = minutesToIso(s);
+        const scheduled_end = minutesToIso(s + drag.durMin);
+        patchTask(drag.id, { scheduled_start, scheduled_end });
+        void supabase
+          .from("tasks")
+          .update({ scheduled_start, scheduled_end })
+          .eq("id", drag.id);
+      }
+      setDrag(null);
+      setDragStart(null);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [drag, dayStart, dayEnd, patchTask, supabase]);
+
   const timelineHeight = (dayEnd - dayStart) * PX_PER_MIN;
   const hourMarks: number[] = [];
   for (let m = Math.ceil(dayStart / 60) * 60; m <= dayEnd; m += 60) hourMarks.push(m);
@@ -1053,6 +1113,7 @@ export function TodayClient({
         {/* Timeline */}
         <section aria-label="Timeline">
           <div
+            ref={timelineRef}
             className="relative"
             style={{ height: `${timelineHeight}px` }}
           >
@@ -1145,21 +1206,28 @@ export function TodayClient({
                 ? toMinutes(t.scheduled_end)
                 : start + DEFAULT_TASK_MINUTES;
               const done = t.status === "done";
+              const isDragging = drag?.id === t.id;
+              const effStart =
+                isDragging && dragStart != null ? dragStart : start;
+              const effEnd = effStart + (end - start);
               return (
                 <div
                   key={t.id}
+                  onPointerDown={(e) => beginDrag(e, t)}
                   className={cn(
-                    "timeline-block group absolute left-14 right-0 overflow-hidden rounded-md border border-l-[3px] px-3 py-1",
+                    "timeline-block group absolute left-14 right-0 touch-none overflow-hidden rounded-md border border-l-[3px] px-3 py-1 select-none",
                     done
                       ? "border-line border-l-line bg-surface"
                       : cn(
-                          "border-line bg-surface shadow-sm",
+                          "cursor-grab border-line bg-surface shadow-sm",
                           t.energy_tag ? ENERGY[t.energy_tag].borderL : "border-l-accent",
                         ),
+                    isDragging && "z-20 cursor-grabbing shadow-[var(--shadow-soft)]",
                   )}
                   style={{
-                    top: `${y(Math.max(start, dayStart))}px`,
-                    height: `${Math.max((Math.min(end, dayEnd) - Math.max(start, dayStart)) * PX_PER_MIN, 24)}px`,
+                    top: `${y(Math.max(effStart, dayStart))}px`,
+                    height: `${Math.max((Math.min(effEnd, dayEnd) - Math.max(effStart, dayStart)) * PX_PER_MIN, 24)}px`,
+                    transition: isDragging ? "none" : undefined,
                   }}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -1172,10 +1240,13 @@ export function TodayClient({
                       {big3Ids.includes(t.id) && <span className="text-accent">★ </span>}
                       {t.title}
                     </p>
-                    <div className="flex shrink-0 gap-1 text-[11px] opacity-0 group-hover:opacity-100">
+                    <div
+                      onPointerDown={(e) => e.stopPropagation()}
+                      className="flex shrink-0 gap-1 text-[11px] opacity-0 group-hover:opacity-100"
+                    >
                       <button
                         onClick={() => void toggleDone(t)}
-                        className="rounded border border-line-strong px-1.5 hover:border-line-strong dark:border-line-strong"
+                        className="rounded border border-line-strong px-1.5 hover:border-accent"
                       >
                         {done ? "undo" : "done"}
                       </button>
@@ -1191,7 +1262,7 @@ export function TodayClient({
                     </div>
                   </div>
                   <p className="text-[11px] text-faint">
-                    {fmtClock(start)}–{fmtClock(end)}
+                    {fmtClock(effStart)}–{fmtClock(effEnd)}
                     {t.energy_tag ? ` · ${t.energy_tag}` : ""}
                   </p>
                 </div>
