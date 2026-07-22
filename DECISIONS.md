@@ -2,6 +2,16 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-22 — Auth: password + Google (drop magic-link-every-time)
+
+- Founder disliked signing in via a fresh magic link each time. Weighed a full **Clerk** swap vs staying on Supabase; chose to **stay on Supabase** and add email+password + Google (the Clerk route is a large, account-gated refactor: Clerk↔Supabase JWT integration + RLS rewrite + `profiles`→`auth.users` FK changes — not worth it to fix "link every time"). Revisit Clerk only if a hosted-auth suite is genuinely needed.
+- `login/actions.ts`: added `signInWithPassword`, `signUpWithPassword` (handles confirm-email on/off), `signInWithGoogle` (OAuth via the existing `/auth/callback`, `next=/inbox`). Login page rebuilt: **Continue with Google** (inline 4-color mark) + email/password (Sign in / Create account) + a magic-link fallback (`formNoValidate`). Sessions persist — no per-visit link.
+- Password works immediately; **Google needs the provider enabled** in the Supabase dashboard with the existing OAuth creds (README). CLAUDE.md §3 keeps Supabase as the auth layer — no deviation.
+
+## 2026-07-22 — v3 visual richness ("controlled blend")
+
+Founder: v1 read bland/monochrome/flat vs Amie/Structured/Things. Chose the controlled blend (calm base + curated color, icons, depth, graphics). Increments on main: **v3-1** energy color palette + iconography (`components/ui/energy.tsx`; colored rails/chips, triage icons); **v3-2** depth + micro-interactions (`--shadow-soft`, `.lift`/`.press`, button press + elevation); **v3-3** progress graphics (`components/ui/ring.tsx` Ring+Meter; Today "day at a glance" + Focus day ring). Remaining: illustration/personality, calendar-grid week, hover cards + context menus, richer onboarding. Full palette in `apps/web/src/app/DESIGN.md`.
+
 ## 2026-07-21 — v2 modernization (founder: "components + features feel obsolete")
 
 A competitor-research workflow was launched (deep-research + market-research across Sunsama/Motion/Akiflow/Amie/Reclaim/Todoist/Linear/…) but died on the session usage limit before returning; the founder's directional picks came through first and drive the build. **Selected:** ⌘K command palette · drag-to-reschedule · inline editing · multi-select+bulk+undo · recurring tasks · subtasks · reminders · focus mode · startup/shutdown rituals · week view · NL quick-add · and the control vocabulary (command bar, contextual toolbar, segmented view-switcher, icon buttons + context menus). Built inline in committed increments (workflows keep hitting the limit); full v2 plan lives in the todo/roadmap.

@@ -1,56 +1,115 @@
 import Link from "next/link";
-import { signInWithMagicLink } from "./actions";
+import {
+  signInWithGoogle,
+  signInWithMagicLink,
+  signInWithPassword,
+  signUpWithPassword,
+} from "./actions";
 
 export const metadata = { title: "Sign in — Reflow" };
+
+const MESSAGES: Record<string, string> = {
+  sent: "Check your inbox — your sign-in link is on its way.",
+  confirm: "Almost there — confirm your email to finish, then sign in.",
+  creds: "Enter a valid email and a password of at least 8 characters.",
+  weak: "Pick a password of at least 8 characters.",
+  signin: "That email and password didn't match. Try again, or create an account.",
+  signup: "Couldn't create that account — the email may already be registered.",
+  google: "Google sign-in isn't enabled yet — use email, or enable it in Supabase.",
+  auth: "That sign-in link expired — request a fresh one below.",
+};
+
+function GoogleMark() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 48 48" aria-hidden>
+      <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" />
+      <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" />
+      <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z" />
+      <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" />
+    </svg>
+  );
+}
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sent?: string; error?: string }>;
+  searchParams: Promise<{ sent?: string; confirm?: string; error?: string }>;
 }) {
-  const { sent, error } = await searchParams;
+  const { sent, confirm, error } = await searchParams;
+  const notice = sent
+    ? MESSAGES.sent
+    : confirm
+      ? MESSAGES.confirm
+      : error
+        ? (MESSAGES[error] ?? "Something didn't work — try again.")
+        : null;
+
+  const inputClass =
+    "w-full rounded-sm border border-line-strong bg-transparent px-3 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-faint focus:border-accent";
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-8 px-6">
+    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-6 px-6">
       <div className="space-y-3">
         <Link href="/" className="text-sm text-faint transition-colors hover:text-muted">
           ← Reflow
         </Link>
-        <h1 className="font-display text-3xl tracking-tight text-ink">
-          Welcome back
-        </h1>
+        <h1 className="font-display text-3xl tracking-tight text-ink">Welcome back</h1>
         <p className="text-sm leading-relaxed text-muted">
-          A magic link, no password. Google sign-in arrives once OAuth
-          credentials are configured.
+          Sign in and pick up your day where it left off.
         </p>
       </div>
 
-      {sent ? (
-        <p className="rounded-lg border border-line bg-surface p-4 text-sm text-muted">
-          Check your inbox — your sign-in link is on its way.
+      {notice && (
+        <p className="rounded-lg border border-line bg-surface p-3 text-sm text-muted">
+          {notice}
         </p>
-      ) : (
-        <form action={signInWithMagicLink} className="flex flex-col gap-3">
-          <input
-            type="email"
-            name="email"
-            required
-            placeholder="you@example.com"
-            className="rounded-sm border border-line-strong bg-transparent px-3 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-faint focus:border-accent"
-          />
-          <button
-            type="submit"
-            className="rounded-sm bg-accent px-3 py-2.5 text-sm font-medium text-paper transition-colors hover:bg-accent-strong"
-          >
-            Email me a sign-in link
-          </button>
-          {error ? (
-            <p className="text-sm text-muted">
-              That didn&apos;t work — check the address and try again.
-            </p>
-          ) : null}
-        </form>
       )}
+
+      <form action={signInWithGoogle}>
+        <button className="press flex w-full items-center justify-center gap-2 rounded-sm border border-line-strong px-3 py-2.5 text-sm font-medium text-ink transition-colors hover:border-accent">
+          <GoogleMark />
+          Continue with Google
+        </button>
+      </form>
+
+      <div className="flex items-center gap-3 text-xs text-faint">
+        <span className="h-px flex-1 bg-line" />
+        or with email
+        <span className="h-px flex-1 bg-line" />
+      </div>
+
+      <form className="flex flex-col gap-3">
+        <input type="email" name="email" required placeholder="you@example.com" className={inputClass} />
+        <input
+          type="password"
+          name="password"
+          required
+          minLength={8}
+          placeholder="password (8+ characters)"
+          className={inputClass}
+        />
+        <div className="flex gap-2">
+          <button
+            formAction={signInWithPassword}
+            className="press flex-1 rounded-sm bg-accent px-3 py-2.5 text-sm font-medium text-paper shadow-[var(--shadow-soft)] transition-colors hover:bg-accent-strong"
+          >
+            Sign in
+          </button>
+          <button
+            formAction={signUpWithPassword}
+            className="press flex-1 rounded-sm border border-line-strong px-3 py-2.5 text-sm font-medium text-ink transition-colors hover:border-accent"
+          >
+            Create account
+          </button>
+        </div>
+        <button
+          formAction={signInWithMagicLink}
+          formNoValidate
+          className="text-center text-xs text-faint underline underline-offset-4 transition-colors hover:text-muted"
+        >
+          email me a one-time sign-in link instead
+        </button>
+      </form>
     </main>
   );
 }

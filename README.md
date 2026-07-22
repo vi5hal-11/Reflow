@@ -41,7 +41,7 @@ Migrations live in `supabase/migrations/` and are applied to the Supabase projec
 
 ## Auth
 
-Email magic-link sign-in works out of the box. Google OAuth requires adding OAuth credentials in the Supabase dashboard (Authentication → Providers → Google) — see DECISIONS.md.
+**Email + password** sign-in/up works out of the box (Supabase may send a one-time confirmation email unless you disable Authentication → Providers → Email → "Confirm email"). **"Continue with Google"** is one click once you enable it: Supabase dashboard → Authentication → Providers → **Google** → paste the same `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, and add `https://<project>.supabase.co/auth/v1/callback` as an authorized redirect URI in Google Cloud Console. A one-time **magic link** remains as a fallback link on the sign-in page.
 
 ## Build phases
 
