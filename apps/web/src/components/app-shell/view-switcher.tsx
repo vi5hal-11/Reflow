@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 // not scattered screens.
 const VIEWS = [
   { href: "/today", label: "Today" },
+  { href: "/week", label: "Week" },
   { href: "/focus", label: "Focus" },
 ];
 

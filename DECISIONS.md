@@ -6,6 +6,10 @@ Running log of implementation decisions that deviate from or refine CLAUDE.md. N
 
 A competitor-research workflow was launched (deep-research + market-research across Sunsama/Motion/Akiflow/Amie/Reclaim/Todoist/Linear/…) but died on the session usage limit before returning; the founder's directional picks came through first and drive the build. **Selected:** ⌘K command palette · drag-to-reschedule · inline editing · multi-select+bulk+undo · recurring tasks · subtasks · reminders · focus mode · startup/shutdown rituals · week view · NL quick-add · and the control vocabulary (command bar, contextual toolbar, segmented view-switcher, icon buttons + context menus). Built inline in committed increments (workflows keep hitting the limit); full v2 plan lives in the todo/roadmap.
 
+### v2-3 — Week / upcoming view
+- `/week` (`week-client.tsx`): a calm 7-day look-ahead (1-col mobile → 7-col desktop). Server fetches a generous planned_date + scheduled window; the client buckets tasks into its exact 7 local days (scheduled_start's local day wins, else planned_date), today's column accented, per-day done/total, Big-3 stars, capped at 5 with "+N more". Read-mostly — tap a day to open Today to plan. ViewSwitcher + palette now expose Week.
+- Verified: tsc + lint + build green.
+
 ### v2-2 — View-switcher restructure + Focus/execution mode
 - `components/app-shell/view-switcher.tsx`: a segmented control (Today · Focus now; Week added in v2-3) — the plan is now one thing with **modes**, not scattered screens. Added to the today header; the palette gained an "Enter Focus" action.
 - `/focus` (`focus-client.tsx`): **execution mode** — operates on today's scheduled flexible blocks, surfaces the current (in-progress, else next) block as a big card with a live time-remaining, progress bar, and a **Done→advance** flow; shows "next up" and a done-count. Empty state routes to Plan my day. Completion marks done + bumps momentum (kept lean vs today's fuller recordCompletion). This is the "turn plan into do" restructure.
