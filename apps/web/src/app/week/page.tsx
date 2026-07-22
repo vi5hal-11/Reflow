@@ -32,6 +32,7 @@ export default async function WeekPage() {
       [
         `and(planned_date.gte.${lo},planned_date.lte.${hi})`,
         `and(scheduled_start.gte.${winStart},scheduled_start.lte.${winEnd})`,
+        `and(is_fixed.eq.true,fixed_start.gte.${winStart},fixed_start.lte.${winEnd})`,
       ].join(","),
     );
 
