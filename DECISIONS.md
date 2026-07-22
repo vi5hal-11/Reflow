@@ -2,6 +2,16 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-21 — v2 modernization (founder: "components + features feel obsolete")
+
+A competitor-research workflow was launched (deep-research + market-research across Sunsama/Motion/Akiflow/Amie/Reclaim/Todoist/Linear/…) but died on the session usage limit before returning; the founder's directional picks came through first and drive the build. **Selected:** ⌘K command palette · drag-to-reschedule · inline editing · multi-select+bulk+undo · recurring tasks · subtasks · reminders · focus mode · startup/shutdown rituals · week view · NL quick-add · and the control vocabulary (command bar, contextual toolbar, segmented view-switcher, icon buttons + context menus). Built inline in committed increments (workflows keep hitting the limit); full v2 plan lives in the todo/roadmap.
+
+### v2-1 — Command spine (⌘K palette + NL quick-add + command bar)
+- `components/command/command-palette.tsx`: a global ⌘K / Ctrl-K menu (also opened by a dispatched `reflow:cmdk` event) — fuzzy-filtered actions (Today, Inbox, Settings, Plan my day, Export) with full keyboard nav (↑↓/↵/esc), and **natural-language quick-add**: any typed text offers "Add …" which captures a task and fires the existing `/parse` edge (reuses the capture pattern, no new backend). Mounted once in `providers.tsx`.
+- `components/command/command-trigger.tsx`: the visible **command bar** (`CommandBar`) + an icon trigger — the app's new spine and the touch/mobile way in. Placed under the today header and the inbox omnibox.
+- "Plan my day" from the palette routes to `/today?plan=1`; today-client reads the flag once and auto-runs the plan.
+- Verified: tsc + lint + build green (purity rule respected — selection reset moved to the input handler).
+
 ## 2026-07-21 — Phases 13 + 14 (inline prep; human/account steps remain with the founder)
 
 Phases 13 (human walkthrough) and 14 (deploy) are gated on the founder — a signed-in session, hosting accounts, and secret rotation aren't something the build agent can do. All the *inline* prep is done:

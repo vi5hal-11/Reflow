@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { CommandBar } from "@/components/command/command-trigger";
 import type { CalendarStatus, CalendarSyncResult } from "@/lib/calendar/types";
 import {
   energyTags,
@@ -268,6 +269,16 @@ export function TodayClient({
     const onFocus = () => void planDay(true);
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
+  }, [planDay]);
+
+  // "Plan my day" from the command palette lands here as ?plan=1.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("plan")) return;
+    url.searchParams.delete("plan");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search);
+    const t = setTimeout(() => void planDay(false), 0);
+    return () => clearTimeout(t);
   }, [planDay]);
 
   const calendarConnected = calendar.available && calendar.connected;
@@ -872,6 +883,8 @@ export function TodayClient({
           </button>
         </nav>
       </header>
+
+      <CommandBar />
 
       {planNotice && (
         <p className="rounded-lg border border-line px-4 py-2 text-sm text-muted dark:border-line">

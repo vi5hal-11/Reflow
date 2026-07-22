@@ -9,6 +9,7 @@ import { inboxTaskColumns, type InboxTask } from "@/lib/types";
 import { signOut } from "../login/actions";
 import { TaskEditSheet } from "./edit-sheet";
 import { EmptyState } from "@/components/ui/empty-state";
+import { CommandBar } from "@/components/command/command-trigger";
 
 function localToday(): string {
   const d = new Date();
@@ -311,6 +312,8 @@ export function InboxClient({
           </button>
         )}
       </form>
+
+      <CommandBar />
 
       {tasks.length === 0 ? (
         <EmptyState
