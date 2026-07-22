@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Inbox, Settings2 } from "lucide-react";
+import { CalendarDays, Inbox, Settings2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Bottom tab bar — the mobile shell (DESIGN.md §6). Fixed above the safe-area
@@ -11,10 +11,11 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { href: "/today", label: "Today", Icon: CalendarDays },
   { href: "/inbox", label: "Inbox", Icon: Inbox },
+  { href: "/habits", label: "Habits", Icon: Sparkles },
   { href: "/settings", label: "Settings", Icon: Settings2 },
 ];
 
-const APP_ROUTES = ["/today", "/inbox", "/settings"];
+const APP_ROUTES = ["/today", "/inbox", "/habits", "/settings"];
 
 export function TabBar() {
   const pathname = usePathname();

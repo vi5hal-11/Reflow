@@ -2,6 +2,20 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-22 — Scope expansion: habits + wellness (deliberate deviation from CLAUDE.md non-goals)
+
+Founder chose to grow Reflow from "calm adaptive planner" into a **planner + no-guilt habit tracker + wellness tools** (habits, mood, journaling, workouts, meditation, insights, AI goals). This **knowingly crosses several CLAUDE.md §2 non-goals** — "not Notion / no note-taking" (journaling), "not a wellness app" (workouts/meditation). **Explicitly NOT crossed** (founder declined): social/friends/accountability/competition ("single-player only") and gamification/XP/leaderboards. The no-guilt principle is preserved everywhere (streaks dim, never reset or shame). Recorded here as the source-of-truth deviation; CLAUDE.md left as the original spec.
+
+- **Button fix**: filled buttons had no border and melted into the one-colour theme → primary now carries a `border-accent-strong` edge + soft raise; quiet gets a hover tint. Applied to the Button component + landing + login. Sage kept (global colour stays calm; colour concentrates in habits/stats per the founder's choice).
+- **Landing page**: full welcome page (hero + Today-timeline preview + 3 pains→solutions + how-it-works + why-different + CTA/footer) replacing the bare front door.
+- **Hydration fix**: `/today` + `/focus` computed `now` during render (UTC server vs local client) → mismatch; now `now` starts at a sentinel and fills in after mount.
+
+### v4-1/v4-2 — habit/wellness data model + Habits area
+- **Migration `habits_and_wellness`** (applied live): `goals`, `habits` (kind habit/meditation/workout, cadence, colour, icon, goal_id), `habit_logs` (unique per habit+date, optional minutes), `mood_logs` (1-5 + note, unique per day), `journal_entries` (unique per day, updated_at trigger). RLS own-rows on all.
+- **Habit palette** (vibrant-but-muted, light+dark) in globals + static `.hc-*`/`.hbg-*` utilities (colour keys are dynamic); `components/habits/habit-meta.tsx` maps colour + lucide icon.
+- **`/habits`**: colourful habit tiles with an icon, a **no-guilt 14-day streak grid** (fills as you show up, dims on a miss, never resets — "N of 14 days", never "streak broken"), one-tap check-in, and a create sheet (title + icon + colour). Added to the tab bar + command palette.
+- Remaining v4: mood check-in, journaling, meditation timer + workout logging, progress insights, AI goals/patterns/reflect-why, completion celebrations.
+
 ## 2026-07-22 — Auth: password + Google (drop magic-link-every-time)
 
 - Founder disliked signing in via a fresh magic link each time. Weighed a full **Clerk** swap vs staying on Supabase; chose to **stay on Supabase** and add email+password + Google (the Clerk route is a large, account-gated refactor: Clerk↔Supabase JWT integration + RLS rewrite + `profiles`→`auth.users` FK changes — not worth it to fix "link every time"). Revisit Clerk only if a hosted-auth suite is genuinely needed.

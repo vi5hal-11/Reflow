@@ -28,6 +28,14 @@
   --energy-shallow: #3d6f68; /* muted teal — light work */
   --energy-admin: #8a5f34; /* muted clay — admin */
 
+  /* Habit palette — vibrant-but-muted, colour lives in habits/stats. */
+  --habit-sage: #6e9a78;
+  --habit-blue: #4f7cac;
+  --habit-violet: #7a5fa0;
+  --habit-teal: #3e8f86;
+  --habit-amber: #b0862e;
+  --habit-clay: #b06a45;
+
   /* motion */
   --ease-flow: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -65,6 +73,13 @@
     --energy-shallow: #7fb8ae;
     --energy-admin: #d0a06a;
 
+    --habit-sage: #8cbe97;
+    --habit-blue: #86a9d6;
+    --habit-violet: #b49bd6;
+    --habit-teal: #6fbcb1;
+    --habit-amber: #d9b25a;
+    --habit-clay: #d69b78;
+
     color-scheme: dark;
   }
 }
@@ -85,8 +100,28 @@
   --energy-deep: #a99bce;
   --energy-shallow: #7fb8ae;
   --energy-admin: #d0a06a;
+  --habit-sage: #8cbe97;
+  --habit-blue: #86a9d6;
+  --habit-violet: #b49bd6;
+  --habit-teal: #6fbcb1;
+  --habit-amber: #d9b25a;
+  --habit-clay: #d69b78;
   color-scheme: dark;
 }
+
+/* Static habit-colour utilities so Tailwind emits them (color keys are dynamic). */
+.hc-sage { color: var(--habit-sage); }
+.hbg-sage { background-color: var(--habit-sage); }
+.hc-blue { color: var(--habit-blue); }
+.hbg-blue { background-color: var(--habit-blue); }
+.hc-violet { color: var(--habit-violet); }
+.hbg-violet { background-color: var(--habit-violet); }
+.hc-teal { color: var(--habit-teal); }
+.hbg-teal { background-color: var(--habit-teal); }
+.hc-amber { color: var(--habit-amber); }
+.hbg-amber { background-color: var(--habit-amber); }
+.hc-clay { color: var(--habit-clay); }
+.hbg-clay { background-color: var(--habit-clay); }
 
 @media (max-width: 640px) {
   :root {
