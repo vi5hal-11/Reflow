@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Mic } from "lucide-react";
+import { Mic, Sun, Clock, X } from "lucide-react";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { TaskEditSheet } from "./edit-sheet";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CommandBar } from "@/components/command/command-trigger";
 import { Button } from "@/components/ui/button";
+import { EnergyChip } from "@/components/ui/energy";
 
 function localToday(): string {
   const d = new Date();
@@ -459,7 +460,7 @@ export function InboxClient({
                     <span className="text-xs text-faint">thinking…</span>
                   )}
                   {task.estimated_minutes !== null && chip(`${task.estimated_minutes}m`)}
-                  {task.energy_tag && chip(task.energy_tag)}
+                  {task.energy_tag && <EnergyChip tag={task.energy_tag} />}
                   {task.recurrence && chip(`↻ ${task.recurrence}`)}
                   {task.remind_at && chip("⏰")}
                   {task.deadline &&
@@ -476,22 +477,24 @@ export function InboxClient({
               <div className="flex shrink-0 gap-1 text-xs">
                 <button
                   onClick={() => void triage(task, "today")}
-                  className="rounded-md bg-accent px-2.5 py-1.5 font-medium text-paper hover:bg-accent-strong dark:bg-accent dark:text-paper dark:hover:bg-accent-strong"
+                  className="inline-flex items-center gap-1 rounded-md bg-accent px-2.5 py-1.5 font-medium text-paper transition-colors hover:bg-accent-strong"
                 >
+                  <Sun className="h-3.5 w-3.5" aria-hidden />
                   Today
                 </button>
                 <button
                   onClick={() => void triage(task, "later")}
-                  className="rounded-md border border-line-strong px-2.5 py-1.5 hover:border-line-strong dark:border-line-strong"
+                  className="inline-flex items-center gap-1 rounded-md border border-line-strong px-2.5 py-1.5 transition-colors hover:border-accent"
                 >
+                  <Clock className="h-3.5 w-3.5" aria-hidden />
                   Later
                 </button>
                 <button
                   onClick={() => void triage(task, "drop")}
                   aria-label="Drop"
-                  className="rounded-md px-2 py-1.5 text-faint hover:text-ink dark:hover:text-faint"
+                  className="rounded-md px-2 py-1.5 text-faint transition-colors hover:text-ink"
                 >
-                  ✕
+                  <X className="h-4 w-4" aria-hidden />
                 </button>
               </div>
             </li>

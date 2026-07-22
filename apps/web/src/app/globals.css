@@ -20,6 +20,14 @@
   --accent-text: #46654e;
   --accent-tint: #e7efe7;
 
+  /* controlled-blend categorical palette — muted, warm-compatible; encodes
+     energy (and later project) so the day is scannable by color. Sage stays
+     the system accent (flow); these are for categorization only. Each is dark
+     enough to double as AA text on paper. */
+  --energy-deep: #574a80; /* muted violet — focus */
+  --energy-shallow: #3d6f68; /* muted teal — light work */
+  --energy-admin: #8a5f34; /* muted clay — admin */
+
   /* motion */
   --ease-flow: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -50,6 +58,10 @@
     --accent-text: #a9d2b2;
     --accent-tint: rgba(140, 190, 151, 0.12);
 
+    --energy-deep: #a99bce;
+    --energy-shallow: #7fb8ae;
+    --energy-admin: #d0a06a;
+
     color-scheme: dark;
   }
 }
@@ -67,6 +79,9 @@
   --accent-strong: #7bae86;
   --accent-text: #a9d2b2;
   --accent-tint: rgba(140, 190, 151, 0.12);
+  --energy-deep: #a99bce;
+  --energy-shallow: #7fb8ae;
+  --energy-admin: #d0a06a;
   color-scheme: dark;
 }
 
@@ -90,6 +105,9 @@
   --color-accent-strong: var(--accent-strong);
   --color-accent-text: var(--accent-text);
   --color-accent-tint: var(--accent-tint);
+  --color-energy-deep: var(--energy-deep);
+  --color-energy-shallow: var(--energy-shallow);
+  --color-energy-admin: var(--energy-admin);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

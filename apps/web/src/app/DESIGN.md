@@ -54,6 +54,26 @@ lightens ~15–20% L to hold AA on dark. Flat — no gradients, no blobs, no car
 but by weight + a drawn checkmark + strikethrough in `--faint`. **No red, ever** — nothing
 overdue, nothing shamed. There is no "error/warning" color in the task surface.
 
+### Categorical palette (v3 "controlled blend" — 2026-07-22)
+
+Founder feedback ("too bland / monochrome vs competitors") → a deliberate evolution: keep the
+calm warm-paper base and sage as the **system accent** (flow), but add a **curated, muted
+categorical palette** so the day is scannable by color — the thing every competitor (Amie,
+Structured, TickTick) has and v1 lacked. Muted on purpose (fits warm paper, stays calm), and
+each colour is dark enough to double as AA body text.
+
+| Energy | Light | Dark | Meaning |
+|---|---|---|---|
+| `--energy-deep` | `#574A80` | `#A99BCE` | focus (muted violet) |
+| `--energy-shallow` | `#3D6F68` | `#7FB8AE` | light work (muted teal) |
+| `--energy-admin` | `#8A5F34` | `#D0A06A` | admin (muted clay) |
+
+Used for: the flexible-block **left-rail** (encodes energy at a glance), energy **chips/dots**,
+and later project colours. Sage still owns the now-line, Big-3 star, primary action, and
+motion — colour categorises, sage signals *flow*. One place: `components/ui/energy.tsx`
+(`ENERGY` map + `EnergyChip`/`EnergyDot`, each with a lucide icon). Project colours arrive with
+the projects feature.
+
 **Theme mechanics:** default light; follow `prefers-color-scheme`; a manual toggle stamps
 `data-theme="light|dark"` on `<html>` and always wins.
 

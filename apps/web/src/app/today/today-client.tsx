@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { CommandBar } from "@/components/command/command-trigger";
 import { ViewSwitcher } from "@/components/app-shell/view-switcher";
 import { nextRecurringInsert } from "@/lib/recurrence";
+import { ENERGY, EnergyDot } from "@/components/ui/energy";
 import type { CalendarStatus, CalendarSyncResult } from "@/lib/calendar/types";
 import {
   energyTags,
@@ -1097,7 +1098,10 @@ export function TodayClient({
                     "timeline-block group absolute left-14 right-0 overflow-hidden rounded-md border border-l-[3px] px-3 py-1",
                     done
                       ? "border-line border-l-line bg-surface"
-                      : "border-line border-l-accent bg-surface shadow-sm",
+                      : cn(
+                          "border-line bg-surface shadow-sm",
+                          t.energy_tag ? ENERGY[t.energy_tag].borderL : "border-l-accent",
+                        ),
                   )}
                   style={{
                     top: `${y(Math.max(start, dayStart))}px`,
@@ -1199,7 +1203,12 @@ export function TodayClient({
                   )}
                   <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-faint">
                     <span>{t.estimated_minutes ?? DEFAULT_TASK_MINUTES}m</span>
-                    {t.energy_tag && <span>· {t.energy_tag}</span>}
+                    {t.energy_tag && (
+                      <span className={cn("inline-flex items-center gap-0.5", ENERGY[t.energy_tag].text)}>
+                        <EnergyDot tag={t.energy_tag} />
+                        {ENERGY[t.energy_tag].label}
+                      </span>
+                    )}
                     <span className="ml-auto flex gap-1">
                       <button
                         onClick={() => setPlacingId(placingId === t.id ? null : t.id)}
