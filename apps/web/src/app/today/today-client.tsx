@@ -124,7 +124,10 @@ export function TodayClient({
   const [tasks, setTasks] = useState<DayTask[]>(initialTasks);
   const [big3Ids, setBig3Ids] = useState<string[]>(initialBig3Ids);
   const [placingId, setPlacingId] = useState<string | null>(null);
-  const [now, setNow] = useState(nowMinutes);
+  // -1 until mount so SSR and first client render match (server is UTC, the
+  // client is local — computing "now" during render mismatches). The tick
+  // effect fills in the real local time right after hydration.
+  const [now, setNow] = useState(-1);
   const timelineRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{
     id: string;
@@ -165,8 +168,13 @@ export function TodayClient({
   const lastCalSyncRef = useRef(0);
 
   useEffect(() => {
-    const t = setInterval(() => setNow(nowMinutes()), 30_000);
-    return () => clearInterval(t);
+    const tick = () => setNow(nowMinutes());
+    const t0 = setTimeout(tick, 0);
+    const iv = setInterval(tick, 30_000);
+    return () => {
+      clearTimeout(t0);
+      clearInterval(iv);
+    };
   }, []);
 
   // Self-healing timezone: planned_date and day math are browser-local, so
@@ -847,7 +855,7 @@ export function TodayClient({
   // nagging — dismiss holds for the session.
   const ritual: "startup" | "shutdown" | null = ritualDismissed
     ? null
-    : now < 12 * 60 && placed.length === 0 && dayTotal > 0
+    : now >= 0 && now < 12 * 60 && placed.length === 0 && dayTotal > 0
       ? "startup"
       : eveningReached && !reflection
         ? "shutdown"

@@ -55,11 +55,18 @@ export function FocusClient({
   const supabase = createClient();
   const toast = useToast();
   const [tasks, setTasks] = useState<DayTask[]>(initialTasks);
-  const [now, setNow] = useState(nowMs);
+  // 0 until mount so SSR matches the first client render (time is computed
+  // client-side after hydration).
+  const [now, setNow] = useState(0);
 
   useEffect(() => {
-    const t = setInterval(() => setNow(nowMs()), 15_000);
-    return () => clearInterval(t);
+    const tick = () => setNow(nowMs());
+    const t0 = setTimeout(tick, 0);
+    const iv = setInterval(tick, 15_000);
+    return () => {
+      clearTimeout(t0);
+      clearInterval(iv);
+    };
   }, []);
 
   const todays = useMemo(
