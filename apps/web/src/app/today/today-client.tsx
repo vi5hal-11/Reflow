@@ -12,6 +12,7 @@ import { ENERGY, EnergyDot } from "@/components/ui/energy";
 import { Meter, Ring } from "@/components/ui/ring";
 import { SunHorizon } from "@/components/ui/sun-horizon";
 import { Welcome } from "@/components/onboarding/welcome";
+import { Button } from "@/components/ui/button";
 import type { CalendarStatus, CalendarSyncResult } from "@/lib/calendar/types";
 import {
   energyTags,
@@ -133,6 +134,7 @@ export function TodayClient({
   } | null>(null);
   const [dragStart, setDragStart] = useState<number | null>(null);
   const dragStartRef = useRef<number | null>(null);
+  const [ritualDismissed, setRitualDismissed] = useState(false);
   const [wildcards, setWildcards] = useState<PlanWildcard[]>([]);
   const [overflowIds, setOverflowIds] = useState<Set<string>>(new Set());
   const [planning, setPlanning] = useState(false);
@@ -840,6 +842,17 @@ export function TodayClient({
 
   const eveningReached = now >= dayEnd - 60;
 
+  // Rituals: a gentle startup frame in the morning (plan the day) and a
+  // shutdown frame in the evening (reflect + roll forward). Skippable, never
+  // nagging — dismiss holds for the session.
+  const ritual: "startup" | "shutdown" | null = ritualDismissed
+    ? null
+    : now < 12 * 60 && placed.length === 0 && dayTotal > 0
+      ? "startup"
+      : eveningReached && !reflection
+        ? "shutdown"
+        : null;
+
   // Drag-to-reschedule: grab a placed block, drop it at a new time (snapped to
   // 5 min). A manual override — no re-flow after, and a no-move tap is a no-op.
   // Fallback for touch/keyboard is the existing place/unplace flow (WCAG 2.5.7).
@@ -985,6 +998,44 @@ export function TodayClient({
       <CommandBar />
 
       <Welcome />
+
+      {ritual === "startup" ? (
+        <section className="rounded-lg border border-line px-4 py-3">
+          <p className="font-display text-lg text-ink">Good morning.</p>
+          <p className="mt-0.5 text-sm text-muted">
+            Star up to three that would make today feel good, then let it flow.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <Button onClick={() => void planDay(false)} disabled={planning}>
+              {planning ? "planning…" : "Plan my day"}
+            </Button>
+            <Button variant="ghost" onClick={() => setRitualDismissed(true)}>
+              later
+            </Button>
+          </div>
+        </section>
+      ) : ritual === "shutdown" ? (
+        <section className="rounded-lg border border-line px-4 py-3">
+          <p className="font-display text-lg text-ink">Closing the day?</p>
+          <p className="mt-0.5 text-sm text-muted">
+            {dayDone} of {dayTotal} done
+            {rolledCount > 0
+              ? " · the rest rolls forward, not overdue"
+              : dayDone === dayTotal && dayTotal > 0
+                ? " · a clean finish"
+                : ""}
+            .
+          </p>
+          <div className="mt-3 flex gap-2">
+            <Button onClick={() => void reflect()} disabled={reflecting}>
+              {reflecting ? "looking back…" : "Reflect on today"}
+            </Button>
+            <Button variant="ghost" onClick={() => setRitualDismissed(true)}>
+              dismiss
+            </Button>
+          </div>
+        </section>
+      ) : null}
 
       {dayTotal > 0 && (
         <section
