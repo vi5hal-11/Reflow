@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { CommandBar } from "@/components/command/command-trigger";
 import { ViewSwitcher } from "@/components/app-shell/view-switcher";
+import { nextRecurringInsert } from "@/lib/recurrence";
 import type { CalendarStatus, CalendarSyncResult } from "@/lib/calendar/types";
 import {
   energyTags,
@@ -557,11 +558,16 @@ export function TodayClient({
         .eq("id", task.id);
       if (error) patchTask(task.id, { status: task.status });
       else {
-        if (!wasDone) recordCompletion(task);
+        if (!wasDone) {
+          recordCompletion(task);
+          if (task.recurrence) {
+            void supabase.from("tasks").insert(nextRecurringInsert(task, userId));
+          }
+        }
         void planDay(true);
       }
     },
-    [supabase, patchTask, planDay, recordCompletion],
+    [supabase, patchTask, planDay, recordCompletion, userId],
   );
 
   const moveToLater = useCallback(

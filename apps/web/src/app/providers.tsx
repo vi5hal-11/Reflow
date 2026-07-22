@@ -3,6 +3,7 @@
 import { ToastProvider } from "@/components/ui/toast";
 import { TabBar } from "@/components/app-shell/tab-bar";
 import { CommandPalette } from "@/components/command/command-palette";
+import { RemindersWatcher } from "@/components/reminders/reminders-watcher";
 
 // Client providers mounted once at the root. Kept tiny — the app is
 // server-first; only genuinely global client context lives here. The mobile
@@ -14,6 +15,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       {children}
       <TabBar />
       <CommandPalette />
+      <RemindersWatcher />
     </ToastProvider>
   );
 }

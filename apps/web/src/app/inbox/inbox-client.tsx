@@ -129,6 +129,8 @@ export function InboxClient({
         planned_date: null,
         parse_suggestions: null,
         parsed_at: null,
+        recurrence: null,
+        remind_at: null,
         created_at: new Date().toISOString(),
       };
       setTasks((prev) => [optimistic, ...prev]);
@@ -458,6 +460,8 @@ export function InboxClient({
                   )}
                   {task.estimated_minutes !== null && chip(`${task.estimated_minutes}m`)}
                   {task.energy_tag && chip(task.energy_tag)}
+                  {task.recurrence && chip(`↻ ${task.recurrence}`)}
+                  {task.remind_at && chip("⏰")}
                   {task.deadline &&
                     chip(`due ${new Date(task.deadline).toLocaleDateString()}`)}
                   {task.parse_suggestions?.suggested_project &&
@@ -548,6 +552,7 @@ export function InboxClient({
       {editing && (
         <TaskEditSheet
           task={editing}
+          userId={userId}
           onClose={() => setEditing(null)}
           onSaved={(patch) => patchTask(editing.id, patch)}
         />

@@ -3,6 +3,20 @@ import { z } from "zod";
 export const energyTags = ["deep", "shallow", "admin"] as const;
 export type EnergyTag = (typeof energyTags)[number];
 
+// v2 task model.
+export const recurrenceFreqs = ["daily", "weekdays", "weekly", "monthly"] as const;
+export type RecurrenceFreq = (typeof recurrenceFreqs)[number];
+
+export type Subtask = {
+  id: string;
+  task_id: string;
+  title: string;
+  done: boolean;
+  position: number;
+};
+
+export const subtaskColumns = "id, task_id, title, done, position";
+
 // The /parse output contract (CLAUDE.md §6) — validated defensively at the
 // boundary even though the service already schema-constrains it.
 export const parseSuggestionsSchema = z.object({
@@ -29,11 +43,13 @@ export type InboxTask = {
   planned_date: string | null;
   parse_suggestions: ParseSuggestions | null;
   parsed_at: string | null;
+  recurrence: RecurrenceFreq | null;
+  remind_at: string | null;
   created_at: string;
 };
 
 export const inboxTaskColumns =
-  "id, title, status, raw_text, estimated_minutes, energy_tag, deadline, planned_date, parse_suggestions, parsed_at, created_at";
+  "id, title, status, raw_text, estimated_minutes, energy_tag, deadline, planned_date, parse_suggestions, parsed_at, recurrence, remind_at, created_at";
 
 // The day view's slice of a task (Phase 2 — manual day + Daily Big 3).
 export type DayTask = {
@@ -50,10 +66,11 @@ export type DayTask = {
   is_big3: boolean;
   scheduled_start: string | null;
   scheduled_end: string | null;
+  recurrence: RecurrenceFreq | null;
 };
 
 export const dayTaskColumns =
-  "id, title, status, estimated_minutes, energy_tag, priority, deadline, planned_date, is_fixed, fixed_start, is_big3, scheduled_start, scheduled_end";
+  "id, title, status, estimated_minutes, energy_tag, priority, deadline, planned_date, is_fixed, fixed_start, is_big3, scheduled_start, scheduled_end, recurrence";
 
 export type DayCalendarEvent = {
   id: string;

@@ -6,6 +6,14 @@ Running log of implementation decisions that deviate from or refine CLAUDE.md. N
 
 A competitor-research workflow was launched (deep-research + market-research across Sunsama/Motion/Akiflow/Amie/Reclaim/Todoist/Linear/…) but died on the session usage limit before returning; the founder's directional picks came through first and drive the build. **Selected:** ⌘K command palette · drag-to-reschedule · inline editing · multi-select+bulk+undo · recurring tasks · subtasks · reminders · focus mode · startup/shutdown rituals · week view · NL quick-add · and the control vocabulary (command bar, contextual toolbar, segmented view-switcher, icon buttons + context menus). Built inline in committed increments (workflows keep hitting the limit); full v2 plan lives in the todo/roadmap.
 
+### v2-5 — Task model: subtasks · recurring · reminders (migration 0005, applied)
+- **Migration 0005** (applied to the live DB): a `subtasks` table (RLS own-rows), `tasks.recurrence` (enum daily/weekdays/weekly/monthly) + `recurrence_dow`/`recurrence_until`, and `tasks.remind_at`.
+- **Subtasks**: the edit sheet is now a real task-detail — a live checklist (optimistic add/toggle/delete, `N/M` header). Types + `subtaskColumns` added.
+- **Recurring — the "chain" model** (`lib/recurrence.ts`): a "Repeat" selector on the sheet; completing a recurring task (in Today *or* Focus) inserts the **next** occurrence (next date per rule, status todo, recurrence carried, placement cleared). Exactly one live instance moves forward — soft roll-forward keeps an undone one on today, so recurrence never piles up (on-brand no-guilt). An `↻ freq` chip shows on inbox rows.
+- **Reminders**: a "Remind me" datetime on the sheet + a global `RemindersWatcher` that, while a tab is open, fires a system Notification (if granted) or a calm toast when a reminder comes due (only ones due after mount — never spams old ones). Background web-push is a noted later infra add. An `⏰` chip shows on inbox rows.
+- The edit sheet now takes `userId` (for subtask + recurrence writes) and scrolls within `max-h-[70vh]`.
+- Verified: tsc + lint + build green; migration `{success:true}`.
+
 ### v2-4 — Multi-select + bulk actions + undo + contextual toolbar
 - Inbox rows gained a select checkbox (icon button, keyboard-reachable); selecting ≥1 raises a **contextual toolbar** (fixed above the tab bar) with bulk Today / Later / Drop and a clear.
 - **Single-level Undo** for every bulk action (§8 forgiveness): actions snapshot the affected tasks; an undo bar restores them via an `upsert` on the original id (re-inserts a dropped row, reverts a today/later row), fixing the today/later counters. 6s auto-dismiss.

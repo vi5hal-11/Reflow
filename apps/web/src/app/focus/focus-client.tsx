@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ViewSwitcher } from "@/components/app-shell/view-switcher";
 import { CommandBar } from "@/components/command/command-trigger";
 import { useToast } from "@/components/ui/toast";
+import { nextRecurringInsert } from "@/lib/recurrence";
 import type { DayTask } from "@/lib/types";
 
 const DEFAULT_TASK_MINUTES = 30;
@@ -110,6 +111,8 @@ export function FocusClient({
           prev.map((t) => (t.id === task.id ? { ...t, status: task.status } : t)),
         );
         toast("Couldn't save — try again.");
+      } else if (task.recurrence) {
+        void supabase.from("tasks").insert(nextRecurringInsert(task, userId));
       }
     },
     [supabase, userId, toast],
