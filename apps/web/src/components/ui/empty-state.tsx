@@ -6,11 +6,13 @@ export function EmptyState({
   title,
   hint,
   action,
+  art,
   className,
 }: {
   title: string;
   hint?: string;
   action?: React.ReactNode;
+  art?: React.ReactNode;
   className?: string;
 }) {
   return (
@@ -20,6 +22,7 @@ export function EmptyState({
         className,
       )}
     >
+      {art ? <div className="mb-2">{art}</div> : null}
       <p className="text-sm text-ink">{title}</p>
       {hint ? <p className="max-w-xs text-sm text-faint">{hint}</p> : null}
       {action ? <div className="pt-1">{action}</div> : null}

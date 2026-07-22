@@ -7,8 +7,10 @@ import { cn } from "@/lib/utils";
 import { CommandBar } from "@/components/command/command-trigger";
 import { ViewSwitcher } from "@/components/app-shell/view-switcher";
 import { nextRecurringInsert } from "@/lib/recurrence";
+import { Check } from "lucide-react";
 import { ENERGY, EnergyDot } from "@/components/ui/energy";
 import { Meter, Ring } from "@/components/ui/ring";
+import { SunHorizon } from "@/components/ui/sun-horizon";
 import type { CalendarStatus, CalendarSyncResult } from "@/lib/calendar/types";
 import {
   energyTags,
@@ -1004,9 +1006,12 @@ export function TodayClient({
           </span>
         </div>
         {big3Done ? (
-          <div className="relative overflow-hidden rounded-lg border border-accent-tint bg-accent-tint px-4 py-3 text-sm text-accent-text">
-            <span className="font-display">That&apos;s a win.</span> Your Big 3 are
-            done — everything else today is a bonus.
+          <div className="relative flex items-center gap-3 overflow-hidden rounded-lg border border-accent-tint bg-accent-tint px-4 py-3 text-sm text-accent-text">
+            <SunHorizon className="h-10 shrink-0" />
+            <p>
+              <span className="font-display">That&apos;s a win.</span> Your Big 3 are
+              done — everything else today is a bonus.
+            </p>
             <span className="win-sweep absolute inset-x-4 bottom-2 block h-px bg-accent" />
           </div>
         ) : null}
@@ -1021,13 +1026,15 @@ export function TodayClient({
                   onClick={() => void toggleDone(t)}
                   aria-label={t.status === "done" ? "Mark not done" : "Mark done"}
                   className={cn(
-                    "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px]",
+                    "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
                     t.status === "done"
                       ? "border-ink bg-ink text-paper"
-                      : "border-line-strong dark:border-line-strong",
+                      : "border-line-strong",
                   )}
                 >
-                  {t.status === "done" ? "✓" : ""}
+                  {t.status === "done" && (
+                    <Check className="h-2.5 w-2.5 motion-safe:animate-[toast-in_180ms_var(--ease-out)]" strokeWidth={3} />
+                  )}
                 </button>
                 <span className={cn("truncate", t.status === "done" && "text-faint line-through")}>
                   {t.title}

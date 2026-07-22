@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { CommandBar } from "@/components/command/command-trigger";
 import { Button } from "@/components/ui/button";
 import { EnergyChip } from "@/components/ui/energy";
+import { SunHorizon } from "@/components/ui/sun-horizon";
 
 function localToday(): string {
   const d = new Date();
@@ -402,6 +403,7 @@ export function InboxClient({
 
       {tasks.length === 0 ? (
         <EmptyState
+          art={<SunHorizon />}
           title="Inbox clear. Nice."
           hint="You're caught up — go do the day."
         />
