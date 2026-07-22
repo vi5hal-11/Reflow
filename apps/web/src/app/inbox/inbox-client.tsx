@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Mic, Sun, Clock, X } from "lucide-react";
+import { Mic, Sun, Clock, X, Pencil, Trash2 } from "lucide-react";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import { CommandBar } from "@/components/command/command-trigger";
 import { Button } from "@/components/ui/button";
 import { EnergyChip } from "@/components/ui/energy";
 import { SunHorizon } from "@/components/ui/sun-horizon";
+import { ContextMenu } from "@/components/ui/context-menu";
 
 function localToday(): string {
   const d = new Date();
@@ -422,7 +423,7 @@ export function InboxClient({
             <li
               onClick={() => setSelected(i)}
               className={cn(
-                "lift group flex items-center justify-between gap-3 rounded-lg border px-4 py-3 transition-colors",
+                "lift group rounded-lg border px-4 py-3 transition-colors",
                 picked.has(task.id)
                   ? "border-accent bg-accent-tint/40"
                   : i === selected
@@ -430,6 +431,36 @@ export function InboxClient({
                     : "border-line",
               )}
             >
+              <ContextMenu
+                className="flex items-center justify-between gap-3"
+                items={[
+                  ...(!task.id.startsWith("temp-")
+                    ? [
+                        {
+                          label: "Edit",
+                          icon: <Pencil className="h-3.5 w-3.5" aria-hidden />,
+                          onSelect: () => setEditing(task),
+                        },
+                      ]
+                    : []),
+                  {
+                    label: "Schedule today",
+                    icon: <Sun className="h-3.5 w-3.5" aria-hidden />,
+                    onSelect: () => void triage(task, "today"),
+                  },
+                  {
+                    label: "Later",
+                    icon: <Clock className="h-3.5 w-3.5" aria-hidden />,
+                    onSelect: () => void triage(task, "later"),
+                  },
+                  {
+                    label: "Drop",
+                    icon: <Trash2 className="h-3.5 w-3.5" aria-hidden />,
+                    onSelect: () => void triage(task, "drop"),
+                    danger: true,
+                  },
+                ]}
+              >
               <div className="flex min-w-0 items-center gap-3">
                 <button
                   onClick={(e) => {
@@ -499,6 +530,7 @@ export function InboxClient({
                   <X className="h-4 w-4" aria-hidden />
                 </button>
               </div>
+              </ContextMenu>
             </li>
             </Fragment>
           ))}
