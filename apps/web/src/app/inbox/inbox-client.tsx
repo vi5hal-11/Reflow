@@ -10,6 +10,7 @@ import { signOut } from "../login/actions";
 import { TaskEditSheet } from "./edit-sheet";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CommandBar } from "@/components/command/command-trigger";
+import { Button } from "@/components/ui/button";
 
 function localToday(): string {
   const d = new Date();
@@ -62,7 +63,23 @@ export function InboxClient({
   const [selected, setSelected] = useState(0);
   const [parsing, setParsing] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<InboxTask | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [undoState, setUndoState] = useState<{
+    label: string;
+    fate: "today" | "later" | "drop";
+    snapshots: InboxTask[];
+  } | null>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const togglePick = useCallback((id: string) => {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const patchTask = useCallback((id: string, patch: Partial<InboxTask>) => {
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
@@ -166,6 +183,71 @@ export function InboxClient({
     },
     [supabase, tasks.length],
   );
+
+  // Bulk triage the selected items, with a single-level Undo (§8 speed +
+  // forgiveness — every destructive action is reversible).
+  const bulkTriage = useCallback(
+    async (fate: "today" | "later" | "drop") => {
+      const snapshots = tasks.filter(
+        (t) => picked.has(t.id) && !t.id.startsWith("temp-"),
+      );
+      if (snapshots.length === 0) {
+        setPicked(new Set());
+        return;
+      }
+      const ids = snapshots.map((s) => s.id);
+      setTasks((prev) => prev.filter((t) => !picked.has(t.id)));
+      setPicked(new Set());
+
+      if (fate === "drop") {
+        await supabase.from("tasks").delete().in("id", ids);
+      } else {
+        const planned = fate === "today" ? localToday() : null;
+        await supabase
+          .from("tasks")
+          .update({ status: "todo", planned_date: planned })
+          .in("id", ids);
+        if (fate === "today") setTodayCount((n) => n + snapshots.length);
+        else setLaterCount((n) => n + snapshots.length);
+      }
+
+      const label =
+        fate === "drop"
+          ? `${snapshots.length} dropped`
+          : `${snapshots.length} moved to ${fate}`;
+      setUndoState({ label, fate, snapshots });
+      if (undoTimer.current) clearTimeout(undoTimer.current);
+      undoTimer.current = setTimeout(() => setUndoState(null), 6000);
+    },
+    [tasks, picked, supabase],
+  );
+
+  const doUndo = useCallback(async () => {
+    const st = undoState;
+    if (!st) return;
+    setUndoState(null);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    setTasks((prev) => [...st.snapshots, ...prev]);
+    if (st.fate === "today") setTodayCount((n) => Math.max(0, n - st.snapshots.length));
+    if (st.fate === "later") setLaterCount((n) => Math.max(0, n - st.snapshots.length));
+    // Restore to inbox (re-inserts a dropped row with its original id;
+    // reverts a today/later row's status/date).
+    await supabase.from("tasks").upsert(
+      st.snapshots.map((t) => ({
+        id: t.id,
+        user_id: userId,
+        title: t.title,
+        raw_text: t.raw_text,
+        status: "inbox" as const,
+        estimated_minutes: t.estimated_minutes,
+        energy_tag: t.energy_tag,
+        deadline: t.deadline,
+        planned_date: null,
+        source: "text" as const,
+      })),
+      { onConflict: "id" },
+    );
+  }, [undoState, supabase, userId]);
 
   // Voice capture (§6): browser speech recognition → straight into the inbox
   // with source='voice'. Never blocks; never required.
@@ -335,13 +417,32 @@ export function InboxClient({
             <li
               onClick={() => setSelected(i)}
               className={cn(
-                "group flex items-center justify-between gap-3 rounded-lg border px-4 py-3",
-                i === selected
-                  ? "border-accent dark:border-accent"
-                  : "border-line dark:border-line",
+                "group flex items-center justify-between gap-3 rounded-lg border px-4 py-3 transition-colors",
+                picked.has(task.id)
+                  ? "border-accent bg-accent-tint/40"
+                  : i === selected
+                    ? "border-accent"
+                    : "border-line",
               )}
             >
-              <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-3">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!task.id.startsWith("temp-")) togglePick(task.id);
+                  }}
+                  aria-label={picked.has(task.id) ? "Deselect" : "Select"}
+                  aria-pressed={picked.has(task.id)}
+                  className={cn(
+                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border text-[10px] transition-colors",
+                    picked.has(task.id)
+                      ? "border-accent bg-accent text-paper"
+                      : "border-line-strong text-transparent hover:border-accent",
+                  )}
+                >
+                  ✓
+                </button>
+                <div className="min-w-0">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -365,6 +466,7 @@ export function InboxClient({
                     chip(
                       `${Math.floor((nowMs - new Date(task.created_at).getTime()) / 86_400_000)}d here`,
                     )}
+                </div>
                 </div>
               </div>
               <div className="flex shrink-0 gap-1 text-xs">
@@ -404,6 +506,44 @@ export function InboxClient({
           ical
         </a>
       </p>
+
+      {picked.size > 0 && (
+        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] z-40 flex justify-center px-4 sm:bottom-6">
+          <div className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm shadow-sm">
+            <span className="text-muted">{picked.size} selected</span>
+            <Button size="sm" onClick={() => void bulkTriage("today")}>
+              Today
+            </Button>
+            <Button size="sm" variant="quiet" onClick={() => void bulkTriage("later")}>
+              Later
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => void bulkTriage("drop")}>
+              Drop
+            </Button>
+            <button
+              onClick={() => setPicked(new Set())}
+              aria-label="Clear selection"
+              className="ml-1 rounded-sm px-1 text-faint hover:text-ink"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {undoState && picked.size === 0 && (
+        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] z-40 flex justify-center px-4 sm:bottom-6">
+          <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2 text-sm shadow-sm">
+            <span className="text-muted">{undoState.label}</span>
+            <button
+              onClick={() => void doUndo()}
+              className="font-medium text-accent-text underline underline-offset-4"
+            >
+              Undo
+            </button>
+          </div>
+        </div>
+      )}
 
       {editing && (
         <TaskEditSheet

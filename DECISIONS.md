@@ -6,6 +6,11 @@ Running log of implementation decisions that deviate from or refine CLAUDE.md. N
 
 A competitor-research workflow was launched (deep-research + market-research across Sunsama/Motion/Akiflow/Amie/Reclaim/Todoist/Linear/…) but died on the session usage limit before returning; the founder's directional picks came through first and drive the build. **Selected:** ⌘K command palette · drag-to-reschedule · inline editing · multi-select+bulk+undo · recurring tasks · subtasks · reminders · focus mode · startup/shutdown rituals · week view · NL quick-add · and the control vocabulary (command bar, contextual toolbar, segmented view-switcher, icon buttons + context menus). Built inline in committed increments (workflows keep hitting the limit); full v2 plan lives in the todo/roadmap.
 
+### v2-4 — Multi-select + bulk actions + undo + contextual toolbar
+- Inbox rows gained a select checkbox (icon button, keyboard-reachable); selecting ≥1 raises a **contextual toolbar** (fixed above the tab bar) with bulk Today / Later / Drop and a clear.
+- **Single-level Undo** for every bulk action (§8 forgiveness): actions snapshot the affected tasks; an undo bar restores them via an `upsert` on the original id (re-inserts a dropped row, reverts a today/later row), fixing the today/later counters. 6s auto-dismiss.
+- Verified: tsc + lint + build green.
+
 ### v2-3 — Week / upcoming view
 - `/week` (`week-client.tsx`): a calm 7-day look-ahead (1-col mobile → 7-col desktop). Server fetches a generous planned_date + scheduled window; the client buckets tasks into its exact 7 local days (scheduled_start's local day wins, else planned_date), today's column accented, per-day done/total, Big-3 stars, capped at 5 with "+N more". Read-mostly — tap a day to open Today to plan. ViewSwitcher + palette now expose Week.
 - Verified: tsc + lint + build green.
