@@ -7,8 +7,8 @@ import { expect, test } from "@playwright/test";
 test("landing renders the identity and a way in", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveTitle(/Reflow/);
-  await expect(page.getByRole("heading", { name: "Reflow" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /start the day/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /heals itself/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /start the day/i }).first()).toBeVisible();
 });
 
 test("sign-in page is reachable and calm", async ({ page }) => {

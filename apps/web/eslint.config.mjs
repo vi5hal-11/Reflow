@@ -13,6 +13,12 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  // Playwright's fixture API uses a `use()` callback, which the React hooks
+  // linter mistakes for a hook. E2E specs aren't React — turn it off there.
+  {
+    files: ["e2e/**"],
+    rules: { "react-hooks/rules-of-hooks": "off" },
+  },
 ]);
 
 export default eslintConfig;

@@ -1,5 +1,35 @@
 # Reflow — signed-in walkthrough (the 60-second promise)
 
+## Automated E2E first (Playwright)
+
+Two suites live in [`e2e/`](e2e):
+
+- **`smoke.spec.ts`** — public routes + graceful degradation. No auth, no
+  secrets. This is what runs in CI (the `e2e` job) on desktop + a Pixel-7
+  mobile viewport.
+- **`core-loop.auth.spec.ts`** — the signed-in loop: capture → triage →
+  place on the timeline → Big 3 → complete → the win banner, plus "Plan my day"
+  degrading gracefully and the settings controls rendering. It seeds a
+  confirmed test user with the Supabase **service key**, so it only runs where
+  `SUPABASE_SECRET_KEY` is set (your `.env.local`); without it, these specs
+  skip themselves.
+
+```bash
+cd apps/web
+npx playwright install chromium   # first time only
+# against a running dev/prod server (reuses one on :3000):
+E2E_BASE_URL=http://localhost:3000 npm run test:e2e
+# or let Playwright build+start it for you:
+npm run build && npm run test:e2e
+```
+
+The signed-in specs write to (and clean up after themselves in) the dev
+Supabase project under a dedicated `e2e-runner@reflow.test` account —
+override with `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD`. Point them at a scratch
+project before running against anything precious.
+
+## Then the human pass
+
 The one thing automated tests can't do: confirm the whole loop *feels* right
 with a real session. Run this once locally (and again on the live URL after
 deploy). Both services must be up:
