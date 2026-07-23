@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { createElement, useCallback, useMemo, useState } from "react";
+import { createElement, useCallback, useMemo, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -24,6 +24,11 @@ import {
 import { MoodCheckin } from "@/components/habits/mood-checkin";
 import { MeditationTimer } from "@/components/habits/meditation-timer";
 import { GoalOnboard } from "@/components/habits/goal-onboard";
+import { Celebration } from "@/components/habits/celebration";
+
+// Rotating, gentle acknowledgements for a completed check-in — calm, never
+// a score. Cycled by a counter so the same one never lands twice in a row.
+const CHEERS = ["Nice — that's today.", "There you are.", "Kept it up.", "You showed up."];
 
 export type Habit = {
   id: string;
@@ -93,6 +98,8 @@ export function HabitsClient({
   const [onboarding, setOnboarding] = useState(false);
   const [timerHabit, setTimerHabit] = useState<Habit | null>(null);
   const [workoutHabit, setWorkoutHabit] = useState<Habit | null>(null);
+  const [celebration, setCelebration] = useState<string | null>(null);
+  const cheerIdx = useRef(0);
 
   const checkIn = useCallback(
     async (habit: Habit) => {
@@ -107,6 +114,7 @@ export function HabitsClient({
       if (has) {
         await supabase.from("habit_logs").delete().eq("habit_id", habit.id).eq("log_date", today);
       } else {
+        setCelebration(CHEERS[cheerIdx.current++ % CHEERS.length]);
         await supabase
           .from("habit_logs")
           .insert({ user_id: userId, habit_id: habit.id, log_date: today });
@@ -121,6 +129,7 @@ export function HabitsClient({
       const next = (minutes[key] ?? 0) + mins;
       setLogged((prev) => new Set(prev).add(key));
       setMinutes((prev) => ({ ...prev, [key]: next }));
+      setCelebration(habit.kind === "meditation" ? "Well sat." : "Nice moving.");
       await supabase.from("habit_logs").upsert(
         { user_id: userId, habit_id: habit.id, log_date: today, minutes: next },
         { onConflict: "habit_id,log_date" },
@@ -157,6 +166,7 @@ export function HabitsClient({
     setGoals((prev) => [...prev, ...newGoals]);
     setHabits((prev) => [...prev, ...newHabits]);
     setOnboarding(false);
+    if (newHabits.length > 0) setCelebration("A gentle plan, ready.");
   }, []);
 
   const actionFor = useCallback(
@@ -307,6 +317,10 @@ export function HabitsClient({
             setWorkoutHabit(null);
           }}
         />
+      )}
+
+      {celebration && (
+        <Celebration message={celebration} onDone={() => setCelebration(null)} />
       )}
     </main>
   );

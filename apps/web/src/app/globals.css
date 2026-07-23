@@ -199,6 +199,38 @@ body {
   }
 }
 
+/* Completion celebration (§7 no-guilt): a calm sunburst, never confetti. A
+   ring eases outward and fades; the word rises softly. Reduced-motion gets
+   the word fade only (rings are motion-safe at the call site). */
+@keyframes celebrate-ring {
+  from {
+    transform: scale(0.5);
+    opacity: 0.45;
+  }
+  to {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+@keyframes celebrate-word {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
 /* "Gentle Glide" (DESIGN §4): a re-flowed block slides to its new time;
    blocks whose top/height don't change never move. Reduced-motion floor
    above neutralizes the transition. */

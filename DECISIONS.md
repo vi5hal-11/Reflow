@@ -14,7 +14,24 @@ Founder chose to grow Reflow from "calm adaptive planner" into a **planner + no-
 - **Migration `habits_and_wellness`** (applied live): `goals`, `habits` (kind habit/meditation/workout, cadence, colour, icon, goal_id), `habit_logs` (unique per habit+date, optional minutes), `mood_logs` (1-5 + note, unique per day), `journal_entries` (unique per day, updated_at trigger). RLS own-rows on all.
 - **Habit palette** (vibrant-but-muted, light+dark) in globals + static `.hc-*`/`.hbg-*` utilities (colour keys are dynamic); `components/habits/habit-meta.tsx` maps colour + lucide icon.
 - **`/habits`**: colourful habit tiles with an icon, a **no-guilt 14-day streak grid** (fills as you show up, dims on a miss, never resets — "N of 14 days", never "streak broken"), one-tap check-in, and a create sheet (title + icon + colour). Added to the tab bar + command palette.
-- Remaining v4: mood check-in, journaling, meditation timer + workout logging, progress insights, AI goals/patterns/reflect-why, completion celebrations.
+
+### v4-3 — daily mood check-in
+- A **weather-metaphor** scale (storm→sun) on the Habits page, deliberately *not* graded faces (faces read as "how well did you perform"; weather just names the day). One tap upserts today's `mood_logs` row; optional note feeds the reflection edge. No-guilt acknowledgements.
+
+### v4-4 — journaling
+- **`/journal`**: one autosaving daily entry (debounced upsert), a rotating gentle prompt, day-stepping that never goes into the future, and an "Earlier" list. Copy: "No streak, no wordcount, no pressure." Linked from Habits header + command palette + mobile tab shell.
+
+### v4-5 — meditation timer + workout logging
+- Habits carry a **kind** (`habit`/`meditation`/`workout`, picked in the create sheet). Meditation opens a **calm full-screen timer** (5–30m presets, soft easing ring, pause/resume) logging minutes sat; workout opens a quick minutes logger (presets + stepper). Both accumulate into the day's `habit_log.minutes` and fill the same grid. Timer keeps all state changes inside the interval callback to satisfy `react-hooks/set-state-in-effect`.
+
+### v4-6 — progress insights
+- **`/progress`** (server component, deterministic — no LLM): this-week tiles (minutes meditated/moved, check-ins, entries, mood notes) in the habit palette, a 14-day **mood line** (inline SVG, no chart lib, gaps break the line), a **momentum ring** (days active / 14), per-habit **consistency bars**. "Numbers to notice, never to measure up to."
+
+### v4-7 — AI goals, habit grouping, pattern analysis (LLM edges)
+- Two new **Gemini edges** on the scheduler, each with a deterministic fallback so nothing dead-ends: **`/suggest-goals`** (onboarding questionnaire → 2–3 goals grouping small habits; palette/icon/kind clamped server-side) and **`/patterns`** (aggregated fortnight numbers → 2–3 gentle observations + one warm "reflect on why" prompt). Web: proxy routes (`/api/suggest-goals` answers even offline via a local fallback; `/api/patterns` degrades quietly), a **GoalOnboard** sheet (questionnaire → review → bulk-add), habits **grouped under goal headings** on `/habits`, and a request-triggered **Insights** card on `/progress` (deliberate: one LLM call when asked, not per page load). Edge fallbacks unit-tested (no-shame word assertions included).
+
+### v4-8 — completion celebrations
+- A **calm sunburst micro-moment** (three sage rings ease out + fade behind a soft rising word) on meaningful completions — habit check-in (rotating gentle phrase), meditation finished ("Well sat."), a plan taking shape ("A gentle plan, ready."). Never confetti/score/streak-count; `pointer-events-none`, self-dismissing, motion-safe (reduced-motion keeps only the word fade). This closes the v4 wellness suite.
 
 ## 2026-07-22 — Auth: password + Google (drop magic-link-every-time)
 
