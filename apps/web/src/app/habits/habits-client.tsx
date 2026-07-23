@@ -13,18 +13,22 @@ import {
   COLOR,
   HABIT_COLORS,
   HABIT_ICON_KEYS,
+  HABIT_KINDS,
+  KIND_META,
   colorOf,
   habitIcon,
   type HabitColor,
+  type HabitKind,
 } from "@/components/habits/habit-meta";
 import { MoodCheckin } from "@/components/habits/mood-checkin";
+import { MeditationTimer } from "@/components/habits/meditation-timer";
 
 export type Habit = {
   id: string;
   title: string;
   icon: string | null;
   color: string;
-  kind: "habit" | "meditation" | "workout";
+  kind: HabitKind;
   cadence: "daily" | "weekly";
   target_per_week: number | null;
   position: number;
@@ -73,8 +77,16 @@ export function HabitsClient({
   const [logged, setLogged] = useState<Set<string>>(
     () => new Set(initialLogs.map((l) => `${l.habit_id}|${l.log_date}`)),
   );
+  const [minutes, setMinutes] = useState<Record<string, number>>(() => {
+    const m: Record<string, number> = {};
+    for (const l of initialLogs) if (l.minutes) m[`${l.habit_id}|${l.log_date}`] = l.minutes;
+    return m;
+  });
   const [creating, setCreating] = useState(false);
+  const [timerHabit, setTimerHabit] = useState<Habit | null>(null);
+  const [workoutHabit, setWorkoutHabit] = useState<Habit | null>(null);
 
+  // Plain check-in toggle (kind === "habit").
   const checkIn = useCallback(
     async (habit: Habit) => {
       const key = `${habit.id}|${today}`;
@@ -86,11 +98,7 @@ export function HabitsClient({
         return next;
       });
       if (has) {
-        await supabase
-          .from("habit_logs")
-          .delete()
-          .eq("habit_id", habit.id)
-          .eq("log_date", today);
+        await supabase.from("habit_logs").delete().eq("habit_id", habit.id).eq("log_date", today);
       } else {
         await supabase
           .from("habit_logs")
@@ -100,8 +108,24 @@ export function HabitsClient({
     [logged, today, supabase, userId],
   );
 
+  // Timed kinds (meditation / workout) — accumulate minutes into today's log.
+  const logMinutes = useCallback(
+    async (habit: Habit, mins: number) => {
+      const key = `${habit.id}|${today}`;
+      const next = (minutes[key] ?? 0) + mins;
+      setLogged((prev) => new Set(prev).add(key));
+      setMinutes((prev) => ({ ...prev, [key]: next }));
+      await supabase.from("habit_logs").upsert(
+        { user_id: userId, habit_id: habit.id, log_date: today, minutes: next },
+        { onConflict: "habit_id,log_date" },
+      );
+      toast(`${mins} min logged.`, "accent");
+    },
+    [minutes, today, supabase, userId, toast],
+  );
+
   const addHabit = useCallback(
-    async (draft: { title: string; icon: string; color: HabitColor }) => {
+    async (draft: { title: string; icon: string; color: HabitColor; kind: HabitKind }) => {
       setCreating(false);
       const { data } = await supabase
         .from("habits")
@@ -110,13 +134,14 @@ export function HabitsClient({
           title: draft.title,
           icon: draft.icon,
           color: draft.color,
+          kind: draft.kind,
           position: habits.length,
         })
         .select("id, title, icon, color, kind, cadence, target_per_week, position")
         .single();
       if (data) {
         setHabits((prev) => [...prev, data as Habit]);
-        toast("Habit added.", "accent");
+        toast("Added.", "accent");
       }
     },
     [supabase, userId, habits.length, toast],
@@ -134,7 +159,7 @@ export function HabitsClient({
             Journal
           </Link>
           <Button size="sm" onClick={() => setCreating(true)}>
-            New habit
+            New
           </Button>
         </div>
       </header>
@@ -155,7 +180,7 @@ export function HabitsClient({
         <EmptyState
           art={<SunHorizon />}
           title="No habits yet."
-          hint="Add one small thing you'd like to return to — read, move, breathe."
+          hint="Add one small thing you'd like to return to — read, move, breathe, sit."
           action={
             <Button size="sm" onClick={() => setCreating(true)}>
               Add a habit
@@ -167,8 +192,22 @@ export function HabitsClient({
           {habits.map((h) => {
             const color = colorOf(h.color);
             const Icon = habitIcon(h.icon);
-            const doneToday = logged.has(`${h.id}|${today}`);
+            const key = `${h.id}|${today}`;
+            const doneToday = logged.has(key);
+            const todayMin = minutes[key] ?? 0;
             const shownUp = days.filter((d) => logged.has(`${h.id}|${d}`)).length;
+            const timed = h.kind !== "habit";
+            const label = doneToday
+              ? timed
+                ? `✓ ${todayMin}m`
+                : "✓ Today"
+              : KIND_META[h.kind].verb;
+            const onAction =
+              h.kind === "meditation"
+                ? () => setTimerHabit(h)
+                : h.kind === "workout"
+                  ? () => setWorkoutHabit(h)
+                  : () => void checkIn(h);
             return (
               <li key={h.id} className="lift rounded-lg border border-line bg-surface p-4">
                 <div className="flex items-center justify-between gap-3">
@@ -181,10 +220,15 @@ export function HabitsClient({
                     >
                       <Icon className="h-4 w-4" aria-hidden />
                     </span>
-                    <span className="truncate font-medium text-ink">{h.title}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-ink">{h.title}</span>
+                      {timed && (
+                        <span className="block text-[11px] text-faint">{KIND_META[h.kind].label}</span>
+                      )}
+                    </span>
                   </div>
                   <button
-                    onClick={() => void checkIn(h)}
+                    onClick={onAction}
                     aria-pressed={doneToday}
                     className={cn(
                       "press shrink-0 rounded-sm border px-3 py-1.5 text-sm font-medium transition-colors",
@@ -193,7 +237,7 @@ export function HabitsClient({
                         : "border-line-strong text-muted hover:border-accent",
                     )}
                   >
-                    {doneToday ? "✓ Today" : "Check in"}
+                    {label}
                   </button>
                 </div>
 
@@ -225,6 +269,26 @@ export function HabitsClient({
       )}
 
       {creating && <CreateHabit onClose={() => setCreating(false)} onCreate={addHabit} />}
+
+      {timerHabit && (
+        <MeditationTimer
+          title={timerHabit.title}
+          defaultMinutes={10}
+          onDone={(m) => void logMinutes(timerHabit, m)}
+          onClose={() => setTimerHabit(null)}
+        />
+      )}
+
+      {workoutHabit && (
+        <WorkoutLog
+          title={workoutHabit.title}
+          onClose={() => setWorkoutHabit(null)}
+          onSave={(m) => {
+            void logMinutes(workoutHabit, m);
+            setWorkoutHabit(null);
+          }}
+        />
+      )}
     </main>
   );
 }
@@ -234,11 +298,12 @@ function CreateHabit({
   onCreate,
 }: {
   onClose: () => void;
-  onCreate: (d: { title: string; icon: string; color: HabitColor }) => void;
+  onCreate: (d: { title: string; icon: string; color: HabitColor; kind: HabitKind }) => void;
 }) {
   const [title, setTitle] = useState("");
   const [icon, setIcon] = useState(HABIT_ICON_KEYS[0]);
   const [color, setColor] = useState<HabitColor>("sage");
+  const [kind, setKind] = useState<HabitKind>("habit");
 
   return (
     <Sheet open onClose={onClose} title="New habit">
@@ -252,6 +317,38 @@ function CreateHabit({
             className="w-full rounded-sm border border-line-strong bg-transparent px-3 py-2.5 text-sm text-ink outline-none placeholder:text-faint focus:border-accent"
           />
         </label>
+
+        <div className="space-y-1.5">
+          <span className="text-sm text-muted">Type</span>
+          <div className="grid grid-cols-3 gap-2">
+            {HABIT_KINDS.map((k) => {
+              const { label, Icon } = KIND_META[k];
+              return (
+                <button
+                  key={k}
+                  onClick={() => setKind(k)}
+                  aria-pressed={kind === k}
+                  className={cn(
+                    "flex flex-col items-center gap-1 rounded-md border py-2.5 text-xs transition-colors",
+                    kind === k
+                      ? "border-accent bg-accent-tint text-ink"
+                      : "border-line text-muted hover:border-accent",
+                  )}
+                >
+                  <Icon className="h-4 w-4" aria-hidden />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-faint">
+            {kind === "meditation"
+              ? "Opens a timer — sit for as long as you like."
+              : kind === "workout"
+                ? "Logs the minutes you moved."
+                : "A simple one-tap check-in."}
+          </p>
+        </div>
 
         <div className="space-y-1.5">
           <span className="text-sm text-muted">Icon</span>
@@ -300,10 +397,70 @@ function CreateHabit({
           </Button>
           <Button
             disabled={!title.trim()}
-            onClick={() => onCreate({ title: title.trim(), icon, color })}
+            onClick={() => onCreate({ title: title.trim(), icon, color, kind })}
           >
-            Add habit
+            Add
           </Button>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
+function WorkoutLog({
+  title,
+  onClose,
+  onSave,
+}: {
+  title: string;
+  onClose: () => void;
+  onSave: (minutes: number) => void;
+}) {
+  const [mins, setMins] = useState(30);
+  const PRESETS = [15, 30, 45, 60];
+
+  return (
+    <Sheet open onClose={onClose} title={`Log — ${title}`}>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap gap-2">
+          {PRESETS.map((p) => (
+            <button
+              key={p}
+              onClick={() => setMins(p)}
+              aria-pressed={mins === p}
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                mins === p ? "border-accent bg-accent-tint text-ink" : "border-line text-muted hover:border-accent",
+              )}
+            >
+              {p}m
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setMins((m) => Math.max(5, m - 5))}
+            className="press h-9 w-9 rounded-md border border-line text-muted hover:border-accent"
+            aria-label="Less"
+          >
+            −
+          </button>
+          <span className="tabular w-16 text-center text-lg font-medium text-ink">{mins} min</span>
+          <button
+            onClick={() => setMins((m) => Math.min(300, m + 5))}
+            className="press h-9 w-9 rounded-md border border-line text-muted hover:border-accent"
+            aria-label="More"
+          >
+            +
+          </button>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={() => onSave(mins)}>Log {mins} min</Button>
         </div>
       </div>
     </Sheet>

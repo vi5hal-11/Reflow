@@ -31,6 +31,21 @@ export function colorOf(c: string | null): HabitColor {
     : "sage";
 }
 
+// Habit "kind" decides how you engage it: a plain habit is a one-tap check-in,
+// a meditation opens a timer, a workout logs minutes. All three share the same
+// no-guilt grid underneath.
+export const HABIT_KINDS = ["habit", "meditation", "workout"] as const;
+export type HabitKind = (typeof HABIT_KINDS)[number];
+
+export const KIND_META: Record<
+  HabitKind,
+  { label: string; Icon: LucideIcon; verb: string }
+> = {
+  habit: { label: "Habit", Icon: Sparkles, verb: "Check in" },
+  meditation: { label: "Meditation", Icon: Brain, verb: "Meditate" },
+  workout: { label: "Workout", Icon: Dumbbell, verb: "Log" },
+};
+
 const ICONS: Record<string, LucideIcon> = {
   sparkles: Sparkles,
   brain: Brain,
