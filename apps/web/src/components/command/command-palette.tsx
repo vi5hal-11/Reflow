@@ -109,6 +109,7 @@ export function CommandPalette() {
       { id: "focus", label: "Enter Focus", keywords: "execute now one thing timer", run: () => { close(); router.push("/focus"); } },
       { id: "inbox", label: "Go to Inbox", keywords: "capture triage", run: () => { close(); router.push("/inbox"); } },
       { id: "habits", label: "Go to Habits", keywords: "streak routine wellness", run: () => { close(); router.push("/habits"); } },
+      { id: "journal", label: "Go to Journal", keywords: "write diary reflect note", run: () => { close(); router.push("/journal"); } },
       { id: "settings", label: "Go to Settings", keywords: "profile energy hours", run: () => { close(); router.push("/settings"); } },
       { id: "plan", label: "Plan my day", keywords: "schedule reflow auto", run: () => { close(); router.push("/today?plan=1"); } },
       { id: "export", label: "Export data (JSON)", keywords: "backup download portability", run: () => { close(); window.location.href = "/api/export?format=json"; } },

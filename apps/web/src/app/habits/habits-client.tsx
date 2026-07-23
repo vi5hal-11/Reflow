@@ -130,8 +130,8 @@ export function HabitsClient({
           <h1 className="font-display text-3xl tracking-tight text-ink">Habits</h1>
         </div>
         <div className="flex items-center gap-4 text-sm text-muted">
-          <Link href="/today" className="hidden underline underline-offset-4 hover:text-ink sm:inline">
-            Today
+          <Link href="/journal" className="underline underline-offset-4 hover:text-ink">
+            Journal
           </Link>
           <Button size="sm" onClick={() => setCreating(true)}>
             New habit
