@@ -155,7 +155,10 @@ export function HabitsClient({
           <h1 className="font-display text-3xl tracking-tight text-ink">Habits</h1>
         </div>
         <div className="flex items-center gap-4 text-sm text-muted">
-          <Link href="/journal" className="underline underline-offset-4 hover:text-ink">
+          <Link href="/progress" className="underline underline-offset-4 hover:text-ink">
+            Progress
+          </Link>
+          <Link href="/journal" className="hidden underline underline-offset-4 hover:text-ink sm:inline">
             Journal
           </Link>
           <Button size="sm" onClick={() => setCreating(true)}>
