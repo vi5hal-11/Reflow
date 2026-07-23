@@ -990,6 +990,9 @@ export function TodayClient({
           <Link href="/inbox" className="hidden underline underline-offset-4 hover:text-muted sm:inline">
             Inbox
           </Link>
+          <Link href="/projects" className="hidden underline underline-offset-4 hover:text-muted sm:inline">
+            Projects
+          </Link>
           <Link href="/settings" className="hidden underline underline-offset-4 hover:text-muted sm:inline">
             Settings
           </Link>

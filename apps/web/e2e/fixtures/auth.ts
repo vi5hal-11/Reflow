@@ -107,7 +107,10 @@ export async function seedTodayTask(
 
 /** Wipe the test account's core-loop rows so each test starts from zero. */
 async function resetUserData(admin: SupabaseClient, userId: string) {
+  // Tasks first — project_id is ON DELETE SET NULL, but clearing tasks keeps
+  // the counts on /projects honest between runs.
   await admin.from("tasks").delete().eq("user_id", userId);
+  await admin.from("projects").delete().eq("user_id", userId);
   await admin.from("daily_plans").delete().eq("user_id", userId);
   await admin.from("momentum").delete().eq("user_id", userId);
   await admin.from("estimate_history").delete().eq("user_id", userId);

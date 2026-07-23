@@ -12,10 +12,12 @@ import {
   subtaskColumns,
   type EnergyTag,
   type InboxTask,
+  type Project,
   type RecurrenceFreq,
   type Subtask,
 } from "@/lib/types";
 import { RECURRENCE_LABEL } from "@/lib/recurrence";
+import { ProjectDot } from "@/components/ui/project-dot";
 
 function toLocalInput(iso: string | null): string {
   if (!iso) return "";
@@ -31,11 +33,13 @@ const inputClass =
 export function TaskEditSheet({
   task,
   userId,
+  projects = [],
   onClose,
   onSaved,
 }: {
   task: InboxTask;
   userId: string;
+  projects?: Project[];
   onClose: () => void;
   onSaved: (patch: Partial<InboxTask>) => void;
 }) {
@@ -44,10 +48,15 @@ export function TaskEditSheet({
   const [title, setTitle] = useState(task.title);
   const [estimate, setEstimate] = useState(task.estimated_minutes?.toString() ?? "");
   const [energy, setEnergy] = useState<EnergyTag | "">(task.energy_tag ?? "");
+  const [projectId, setProjectId] = useState<string | null>(task.project_id ?? null);
   const [deadline, setDeadline] = useState(toLocalInput(task.deadline));
   const [recurrence, setRecurrence] = useState<RecurrenceFreq | "">(task.recurrence ?? "");
   const [remindAt, setRemindAt] = useState(toLocalInput(task.remind_at));
   const [saving, setSaving] = useState(false);
+
+  // Show archived projects only if this task is already in one (so its label
+  // still renders); otherwise offer just the active buckets.
+  const selectable = projects.filter((p) => !p.archived || p.id === projectId);
 
   // Subtasks — loaded on open, edited live (each change persists immediately).
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
@@ -111,6 +120,7 @@ export function TaskEditSheet({
         ? Math.max(1, Math.min(480, Math.round(Number(estimate))))
         : null,
       energy_tag: energy || null,
+      project_id: projectId,
       deadline: deadline ? new Date(deadline).toISOString() : null,
       recurrence: recurrence || null,
       remind_at: remindAt ? new Date(remindAt).toISOString() : null,
@@ -174,6 +184,43 @@ export function TaskEditSheet({
             ))}
           </div>
         </div>
+
+        {/* Project */}
+        {selectable.length > 0 && (
+          <div className="space-y-1.5">
+            <span className="text-sm text-muted">Project</span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setProjectId(null)}
+                aria-pressed={projectId === null}
+                className={cn(
+                  "rounded-sm border px-3 py-1.5 text-sm transition-colors",
+                  projectId === null
+                    ? "border-accent text-ink"
+                    : "border-line-strong text-muted hover:border-accent",
+                )}
+              >
+                None
+              </button>
+              {selectable.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setProjectId(p.id)}
+                  aria-pressed={projectId === p.id}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-sm border px-3 py-1.5 text-sm transition-colors",
+                    projectId === p.id
+                      ? "border-accent bg-accent-tint text-accent-text"
+                      : "border-line-strong text-muted hover:border-accent",
+                  )}
+                >
+                  <ProjectDot color={p.color} />
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Subtasks */}
         <div className="space-y-2">

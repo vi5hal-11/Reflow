@@ -1,17 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { Mic, Sun, Clock, X, Pencil, Trash2 } from "lucide-react";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Mic, Sun, Clock, X, Pencil, Trash2, Plus } from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import { inboxTaskColumns, type InboxTask } from "@/lib/types";
+import {
+  inboxTaskColumns,
+  projectColumns,
+  type InboxTask,
+  type Project,
+} from "@/lib/types";
+import { DEFAULT_PROJECT_COLOR } from "@/lib/projects";
 import { signOut } from "../login/actions";
 import { TaskEditSheet } from "./edit-sheet";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CommandBar } from "@/components/command/command-trigger";
 import { Button } from "@/components/ui/button";
 import { EnergyChip } from "@/components/ui/energy";
+import { ProjectDot } from "@/components/ui/project-dot";
 import { SunHorizon } from "@/components/ui/sun-horizon";
 import { ContextMenu } from "@/components/ui/context-menu";
 
@@ -52,21 +59,31 @@ export function InboxClient({
   initialTasks,
   initialTodayCount,
   initialLaterCount,
+  initialProjects,
 }: {
   userId: string;
   initialTasks: InboxTask[];
   initialTodayCount: number;
   initialLaterCount: number;
+  initialProjects: Project[];
 }) {
   const supabase = createClient();
   const [tasks, setTasks] = useState<InboxTask[]>(initialTasks);
   const [todayCount, setTodayCount] = useState(initialTodayCount);
   const [laterCount, setLaterCount] = useState(initialLaterCount);
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
+  // Filter the inbox by a project: null = all, "none" = unassigned, else id.
+  const [filter, setFilter] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [selected, setSelected] = useState(0);
   const [parsing, setParsing] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<InboxTask | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+
+  const projectsById = useMemo(
+    () => new Map(projects.map((p) => [p.id, p])),
+    [projects],
+  );
   const [undoState, setUndoState] = useState<{
     label: string;
     fate: "today" | "later" | "drop";
@@ -87,6 +104,44 @@ export function InboxClient({
   const patchTask = useCallback((id: string, patch: Partial<InboxTask>) => {
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   }, []);
+
+  const assignProject = useCallback(
+    async (taskId: string, projectId: string | null) => {
+      patchTask(taskId, { project_id: projectId });
+      const { error } = await supabase
+        .from("tasks")
+        .update({ project_id: projectId })
+        .eq("id", taskId);
+      if (error) patchTask(taskId, { project_id: null });
+    },
+    [supabase, patchTask],
+  );
+
+  // One-tap from the AI's suggested project (§6): reuse a matching project by
+  // name, or create it, then assign — the whole thing in a single click.
+  const acceptSuggestedProject = useCallback(
+    async (task: InboxTask, name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed || task.id.startsWith("temp-")) return;
+      const existing = projects.find(
+        (p) => p.name.toLowerCase() === trimmed.toLowerCase(),
+      );
+      if (existing) {
+        void assignProject(task.id, existing.id);
+        return;
+      }
+      const { data } = await supabase
+        .from("projects")
+        .insert({ user_id: userId, name: trimmed, color: DEFAULT_PROJECT_COLOR })
+        .select(projectColumns)
+        .single();
+      if (!data) return;
+      const created = data as Project;
+      setProjects((prev) => [...prev, created]);
+      void assignProject(task.id, created.id);
+    },
+    [projects, supabase, assignProject, userId],
+  );
 
   const enrich = useCallback(
     async (taskId: string) => {
@@ -130,6 +185,7 @@ export function InboxClient({
         energy_tag: null,
         deadline: null,
         planned_date: null,
+        project_id: null,
         parse_suggestions: null,
         parsed_at: null,
         recurrence: null,
@@ -295,7 +351,14 @@ export function InboxClient({
   // gentle section below the fresh ones — keep, schedule, or drop.
   const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
   const nowMs = new Date().getTime();
-  const firstOldIndex = tasks.findIndex(
+
+  const visibleTasks = useMemo(() => {
+    if (filter === null) return tasks;
+    if (filter === "none") return tasks.filter((t) => !t.project_id);
+    return tasks.filter((t) => t.project_id === filter);
+  }, [tasks, filter]);
+
+  const firstOldIndex = visibleTasks.findIndex(
     (t) => nowMs - new Date(t.created_at).getTime() >= WEEK_MS,
   );
 
@@ -307,13 +370,13 @@ export function InboxClient({
         inputRef.current?.focus();
         return;
       }
-      if (inOmnibox || tasks.length === 0) return;
-      const current = tasks[Math.min(selected, tasks.length - 1)];
+      if (inOmnibox || visibleTasks.length === 0) return;
+      const current = visibleTasks[Math.min(selected, visibleTasks.length - 1)];
       switch (e.key) {
         case "j":
         case "ArrowDown":
           e.preventDefault();
-          setSelected((s) => Math.min(s + 1, tasks.length - 1));
+          setSelected((s) => Math.min(s + 1, visibleTasks.length - 1));
           break;
         case "k":
         case "ArrowUp":
@@ -333,7 +396,7 @@ export function InboxClient({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tasks, selected, triage]);
+  }, [visibleTasks, selected, triage]);
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-8 px-6 py-12 pb-28 sm:pb-12">
@@ -350,6 +413,9 @@ export function InboxClient({
           </span>
           <Link href="/today" className="hidden underline underline-offset-4 sm:inline">
             today
+          </Link>
+          <Link href="/projects" className="hidden underline underline-offset-4 sm:inline">
+            projects
           </Link>
           <Link href="/settings" className="hidden underline underline-offset-4 sm:inline">
             settings
@@ -402,15 +468,71 @@ export function InboxClient({
 
       <CommandBar />
 
-      {tasks.length === 0 ? (
+      {/* Project filters — a calm way to focus the inbox on one bucket. */}
+      {projects.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            onClick={() => setFilter(null)}
+            aria-pressed={filter === null}
+            className={cn(
+              "rounded-pill border px-2.5 py-1 text-xs transition-colors",
+              filter === null
+                ? "border-accent bg-accent-tint text-accent-text"
+                : "border-line text-muted hover:border-accent",
+            )}
+          >
+            All
+          </button>
+          {projects.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setFilter(filter === p.id ? null : p.id)}
+              aria-pressed={filter === p.id}
+              className={cn(
+                "flex items-center gap-1.5 rounded-pill border px-2.5 py-1 text-xs transition-colors",
+                filter === p.id
+                  ? "border-accent bg-accent-tint text-accent-text"
+                  : "border-line text-muted hover:border-accent",
+              )}
+            >
+              <ProjectDot color={p.color} />
+              {p.name}
+            </button>
+          ))}
+          <button
+            onClick={() => setFilter(filter === "none" ? null : "none")}
+            aria-pressed={filter === "none"}
+            className={cn(
+              "rounded-pill border px-2.5 py-1 text-xs transition-colors",
+              filter === "none"
+                ? "border-accent bg-accent-tint text-accent-text"
+                : "border-line text-muted hover:border-accent",
+            )}
+          >
+            No project
+          </button>
+          <Link
+            href="/projects"
+            className="ml-auto text-xs text-faint underline underline-offset-4 hover:text-muted"
+          >
+            manage
+          </Link>
+        </div>
+      )}
+
+      {visibleTasks.length === 0 ? (
         <EmptyState
           art={<SunHorizon />}
-          title="Inbox clear. Nice."
-          hint="You're caught up — go do the day."
+          title={filter !== null ? "Nothing here." : "Inbox clear. Nice."}
+          hint={
+            filter !== null
+              ? "No inbox items in this filter."
+              : "You're caught up — go do the day."
+          }
         />
       ) : (
         <ul className="flex flex-col gap-2">
-          {tasks.map((task, i) => (
+          {visibleTasks.map((task, i) => (
             <Fragment key={task.id}>
             {i === firstOldIndex && (
               <li
@@ -498,8 +620,29 @@ export function InboxClient({
                   {task.remind_at && chip("⏰")}
                   {task.deadline &&
                     chip(`due ${new Date(task.deadline).toLocaleDateString()}`)}
-                  {task.parse_suggestions?.suggested_project &&
-                    chip(`# ${task.parse_suggestions.suggested_project}`)}
+                  {task.project_id && projectsById.has(task.project_id) ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-xs text-muted">
+                      <ProjectDot color={projectsById.get(task.project_id)!.color} />
+                      {projectsById.get(task.project_id)!.name}
+                    </span>
+                  ) : (
+                    task.parse_suggestions?.suggested_project && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void acceptSuggestedProject(
+                            task,
+                            task.parse_suggestions!.suggested_project!,
+                          );
+                        }}
+                        title="Create this project and assign it"
+                        className="inline-flex items-center gap-1 rounded-full border border-dashed border-line px-2 py-0.5 text-xs text-faint transition-colors hover:border-accent hover:text-accent-text"
+                      >
+                        <Plus className="h-3 w-3" aria-hidden />#{" "}
+                        {task.parse_suggestions.suggested_project}
+                      </button>
+                    )
+                  )}
                   {nowMs - new Date(task.created_at).getTime() >= WEEK_MS &&
                     chip(
                       `${Math.floor((nowMs - new Date(task.created_at).getTime()) / 86_400_000)}d here`,
@@ -590,6 +733,7 @@ export function InboxClient({
         <TaskEditSheet
           task={editing}
           userId={userId}
+          projects={projects}
           onClose={() => setEditing(null)}
           onSaved={(patch) => patchTask(editing.id, patch)}
         />

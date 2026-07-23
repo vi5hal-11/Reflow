@@ -32,6 +32,17 @@ export const parseSuggestionsSchema = z.object({
 
 export type ParseSuggestions = z.infer<typeof parseSuggestionsSchema>;
 
+// A project — a lightweight bucket tasks can belong to (Phase 10 stream B).
+export type Project = {
+  id: string;
+  name: string;
+  color: string | null;
+  archived: boolean;
+  created_at: string;
+};
+
+export const projectColumns = "id, name, color, archived, created_at";
+
 export type InboxTask = {
   id: string;
   title: string;
@@ -41,6 +52,7 @@ export type InboxTask = {
   energy_tag: EnergyTag | null;
   deadline: string | null;
   planned_date: string | null;
+  project_id: string | null;
   parse_suggestions: ParseSuggestions | null;
   parsed_at: string | null;
   recurrence: RecurrenceFreq | null;
@@ -49,7 +61,7 @@ export type InboxTask = {
 };
 
 export const inboxTaskColumns =
-  "id, title, status, raw_text, estimated_minutes, energy_tag, deadline, planned_date, parse_suggestions, parsed_at, recurrence, remind_at, created_at";
+  "id, title, status, raw_text, estimated_minutes, energy_tag, deadline, planned_date, project_id, parse_suggestions, parsed_at, recurrence, remind_at, created_at";
 
 // The day view's slice of a task (Phase 2 — manual day + Daily Big 3).
 export type DayTask = {

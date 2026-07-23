@@ -15,7 +15,7 @@ const TABS = [
   { href: "/settings", label: "Settings", Icon: Settings2 },
 ];
 
-const APP_ROUTES = ["/today", "/inbox", "/habits", "/journal", "/progress", "/settings"];
+const APP_ROUTES = ["/today", "/inbox", "/habits", "/journal", "/progress", "/projects", "/settings"];
 
 export function TabBar() {
   const pathname = usePathname();

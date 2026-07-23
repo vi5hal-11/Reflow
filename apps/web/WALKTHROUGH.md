@@ -48,6 +48,10 @@ Open http://localhost:3000 and sign in (magic link to your email).
       instantly; a moment later the AI adds an estimate / energy / deadline chip.
 - [ ] **Edit** — click a task's title → the sheet opens → tweak the estimate → Save.
 - [ ] **Triage** — `t` (today) / `l` (later) / `x` (drop), or the buttons.
+- [ ] **Projects** — make one on /projects, assign it from a task's edit sheet,
+      then filter the inbox by it. If the AI suggested a project, one-tap the
+      dashed `+ #name` chip to create + assign it. Archiving/deleting a project
+      never deletes its tasks.
 - [ ] **Settings** — set your working hours and *paint* a couple of Deep hours in
       the energy grid; Save.
 - [ ] **Plan my day** — on /today, hit it. Tasks land around fixed blocks; deep
