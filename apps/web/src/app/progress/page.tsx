@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Ring } from "@/components/ui/ring";
 import { cn } from "@/lib/utils";
 import { COLOR, colorOf, habitIcon } from "@/components/habits/habit-meta";
+import { Insights, type PatternsPayload } from "@/components/habits/insights";
 
 export const metadata = { title: "Progress — Reflow" };
 
@@ -98,6 +99,31 @@ export default async function ProgressPage() {
   for (const e of entryList) if (days14.includes(e.entry_date)) activeDays.add(e.entry_date);
   const momentum = activeDays.size / 14;
 
+  // Fortnight aggregates for the gentle pattern edge (no raw rows leave here).
+  const set14 = new Set(days14);
+  let meditMin14 = 0;
+  let workoutMin14 = 0;
+  for (const l of logList) {
+    if (!set14.has(l.log_date)) continue;
+    const k = kindOf.get(l.habit_id);
+    if (k === "meditation") meditMin14 += l.minutes ?? 0;
+    else if (k === "workout") workoutMin14 += l.minutes ?? 0;
+  }
+  const journalDays14 = entryList.filter((e) => set14.has(e.entry_date)).length;
+  const patternsPayload: PatternsPayload = {
+    mood_series: moodSeries,
+    habits: habitList.map((h) => ({
+      title: h.title,
+      kind: h.kind as string,
+      days_active: days14.filter((d) => (logsByHabit.get(h.id) ?? new Set()).has(d)).length,
+      window_days: 14,
+    })),
+    journal_days: journalDays14,
+    meditation_minutes: meditMin14,
+    workout_minutes: workoutMin14,
+    window_days: 14,
+  };
+
   const tiles = [
     { label: "meditated", value: `${meditMin}m`, color: "violet" as const },
     { label: "moved", value: `${workoutMin}m`, color: "clay" as const },
@@ -127,6 +153,8 @@ export default async function ProgressPage() {
         A gentle look back — how the last two weeks have flowed. Numbers to
         notice, never to measure up to.
       </p>
+
+      <Insights payload={patternsPayload} />
 
       {/* This week */}
       <section className="space-y-3">

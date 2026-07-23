@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { createElement, useCallback, useMemo, useState } from "react";
+import { Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import {
 } from "@/components/habits/habit-meta";
 import { MoodCheckin } from "@/components/habits/mood-checkin";
 import { MeditationTimer } from "@/components/habits/meditation-timer";
+import { GoalOnboard } from "@/components/habits/goal-onboard";
 
 export type Habit = {
   id: string;
@@ -32,8 +34,10 @@ export type Habit = {
   cadence: "daily" | "weekly";
   target_per_week: number | null;
   position: number;
+  goal_id: string | null;
 };
 export type HabitLog = { habit_id: string; log_date: string; minutes: number | null };
+export type Goal = { id: string; title: string; color: string };
 
 function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -61,6 +65,7 @@ export function HabitsClient({
   initialLogs,
   initialMood,
   initialMoodNote,
+  initialGoals,
 }: {
   userId: string;
   today: string;
@@ -68,12 +73,14 @@ export function HabitsClient({
   initialLogs: HabitLog[];
   initialMood: number | null;
   initialMoodNote: string | null;
+  initialGoals: Goal[];
 }) {
   const supabase = createClient();
   const toast = useToast();
   const days = useMemo(() => lastNDays(GRID_DAYS, today), [today]);
 
   const [habits, setHabits] = useState<Habit[]>(initialHabits);
+  const [goals, setGoals] = useState<Goal[]>(initialGoals);
   const [logged, setLogged] = useState<Set<string>>(
     () => new Set(initialLogs.map((l) => `${l.habit_id}|${l.log_date}`)),
   );
@@ -83,10 +90,10 @@ export function HabitsClient({
     return m;
   });
   const [creating, setCreating] = useState(false);
+  const [onboarding, setOnboarding] = useState(false);
   const [timerHabit, setTimerHabit] = useState<Habit | null>(null);
   const [workoutHabit, setWorkoutHabit] = useState<Habit | null>(null);
 
-  // Plain check-in toggle (kind === "habit").
   const checkIn = useCallback(
     async (habit: Habit) => {
       const key = `${habit.id}|${today}`;
@@ -108,7 +115,6 @@ export function HabitsClient({
     [logged, today, supabase, userId],
   );
 
-  // Timed kinds (meditation / workout) — accumulate minutes into today's log.
   const logMinutes = useCallback(
     async (habit: Habit, mins: number) => {
       const key = `${habit.id}|${today}`;
@@ -137,7 +143,7 @@ export function HabitsClient({
           kind: draft.kind,
           position: habits.length,
         })
-        .select("id, title, icon, color, kind, cadence, target_per_week, position")
+        .select("id, title, icon, color, kind, cadence, target_per_week, position, goal_id")
         .single();
       if (data) {
         setHabits((prev) => [...prev, data as Habit]);
@@ -146,6 +152,40 @@ export function HabitsClient({
     },
     [supabase, userId, habits.length, toast],
   );
+
+  const onOnboarded = useCallback((newGoals: Goal[], newHabits: Habit[]) => {
+    setGoals((prev) => [...prev, ...newGoals]);
+    setHabits((prev) => [...prev, ...newHabits]);
+    setOnboarding(false);
+  }, []);
+
+  const actionFor = useCallback(
+    (h: Habit) =>
+      h.kind === "meditation"
+        ? () => setTimerHabit(h)
+        : h.kind === "workout"
+          ? () => setWorkoutHabit(h)
+          : () => void checkIn(h),
+    [checkIn],
+  );
+
+  // Group habits under their goal; anything ungrouped falls to a plain list.
+  const groups = useMemo(() => {
+    const byGoal = new Map<string, Habit[]>();
+    for (const h of habits) {
+      if (!h.goal_id) continue;
+      if (!byGoal.has(h.goal_id)) byGoal.set(h.goal_id, []);
+      byGoal.get(h.goal_id)!.push(h);
+    }
+    const goalIds = new Set(goals.map((g) => g.id));
+    const sections = goals
+      .map((g) => ({ goal: g, items: byGoal.get(g.id) ?? [] }))
+      .filter((s) => s.items.length > 0);
+    const ungrouped = habits.filter((h) => !h.goal_id || !goalIds.has(h.goal_id));
+    return { sections, ungrouped };
+  }, [habits, goals]);
+
+  const tileProps = { today, days, logged, minutes };
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-6 px-6 py-10 pb-28 sm:pb-10">
@@ -183,95 +223,71 @@ export function HabitsClient({
         <EmptyState
           art={<SunHorizon />}
           title="No habits yet."
-          hint="Add one small thing you'd like to return to — read, move, breathe, sit."
+          hint="Let a few goals take shape, or add one small thing yourself."
           action={
-            <Button size="sm" onClick={() => setCreating(true)}>
-              Add a habit
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button size="sm" onClick={() => setOnboarding(true)}>
+                Shape my goals
+              </Button>
+              <Button size="sm" variant="quiet" onClick={() => setCreating(true)}>
+                Add one manually
+              </Button>
+            </div>
           }
         />
       ) : (
-        <ul className="flex flex-col gap-3">
-          {habits.map((h) => {
-            const color = colorOf(h.color);
-            const Icon = habitIcon(h.icon);
-            const key = `${h.id}|${today}`;
-            const doneToday = logged.has(key);
-            const todayMin = minutes[key] ?? 0;
-            const shownUp = days.filter((d) => logged.has(`${h.id}|${d}`)).length;
-            const timed = h.kind !== "habit";
-            const label = doneToday
-              ? timed
-                ? `✓ ${todayMin}m`
-                : "✓ Today"
-              : KIND_META[h.kind].verb;
-            const onAction =
-              h.kind === "meditation"
-                ? () => setTimerHabit(h)
-                : h.kind === "workout"
-                  ? () => setWorkoutHabit(h)
-                  : () => void checkIn(h);
+        <div className="flex flex-col gap-6">
+          {groups.sections.map(({ goal, items }) => {
+            const gc = colorOf(goal.color);
             return (
-              <li key={h.id} className="lift rounded-lg border border-line bg-surface p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <span
-                      className={cn(
-                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-paper",
-                        COLOR[color].bg,
-                      )}
-                    >
-                      <Icon className="h-4 w-4" aria-hidden />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium text-ink">{h.title}</span>
-                      {timed && (
-                        <span className="block text-[11px] text-faint">{KIND_META[h.kind].label}</span>
-                      )}
-                    </span>
-                  </div>
-                  <button
-                    onClick={onAction}
-                    aria-pressed={doneToday}
-                    className={cn(
-                      "press shrink-0 rounded-sm border px-3 py-1.5 text-sm font-medium transition-colors",
-                      doneToday
-                        ? cn("border-transparent text-paper", COLOR[color].bg)
-                        : "border-line-strong text-muted hover:border-accent",
-                    )}
-                  >
-                    {label}
-                  </button>
-                </div>
-
-                <div className="mt-3 flex items-center gap-3">
-                  <div className="flex gap-1">
-                    {days.map((d) => {
-                      const on = logged.has(`${h.id}|${d}`);
-                      return (
-                        <span
-                          key={d}
-                          title={d}
-                          className={cn(
-                            "h-3.5 w-3.5 rounded-[3px]",
-                            on ? COLOR[color].bg : "bg-line",
-                            d === today && "ring-1 ring-accent ring-offset-1",
-                          )}
-                        />
-                      );
-                    })}
-                  </div>
-                  <span className="ml-auto text-[11px] text-faint">
-                    {shownUp} of {GRID_DAYS} days
-                  </span>
-                </div>
-              </li>
+              <section key={goal.id} className="space-y-2.5">
+                <h2 className="flex items-center gap-2 text-sm font-medium text-ink">
+                  <span className={cn("h-2.5 w-2.5 rounded-full", COLOR[gc].bg)} />
+                  {goal.title}
+                </h2>
+                <ul className="flex flex-col gap-3">
+                  {items.map((h) => (
+                    <HabitTile key={h.id} habit={h} onAction={actionFor(h)} {...tileProps} />
+                  ))}
+                </ul>
+              </section>
             );
           })}
-        </ul>
+
+          {groups.ungrouped.length > 0 && (
+            <section className="space-y-2.5">
+              {groups.sections.length > 0 && (
+                <h2 className="text-sm font-medium text-muted">Other</h2>
+              )}
+              <ul className="flex flex-col gap-3">
+                {groups.ungrouped.map((h) => (
+                  <HabitTile key={h.id} habit={h} onAction={actionFor(h)} {...tileProps} />
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <button
+            onClick={() => setOnboarding(true)}
+            className="press flex items-center justify-center gap-2 rounded-lg border border-dashed border-line-strong py-3 text-sm text-muted hover:border-accent hover:text-ink"
+          >
+            <Sparkles className="h-4 w-4" aria-hidden />
+            Shape goals with AI
+          </button>
+        </div>
       )}
 
       {creating && <CreateHabit onClose={() => setCreating(false)} onCreate={addHabit} />}
+
+      {onboarding && (
+        <GoalOnboard
+          userId={userId}
+          basePosition={habits.length}
+          existingTitles={habits.map((h) => h.title)}
+          onClose={() => setOnboarding(false)}
+          onAdded={onOnboarded}
+        />
+      )}
 
       {timerHabit && (
         <MeditationTimer
@@ -293,6 +309,87 @@ export function HabitsClient({
         />
       )}
     </main>
+  );
+}
+
+function HabitTile({
+  habit,
+  today,
+  days,
+  logged,
+  minutes,
+  onAction,
+}: {
+  habit: Habit;
+  today: string;
+  days: string[];
+  logged: Set<string>;
+  minutes: Record<string, number>;
+  onAction: () => void;
+}) {
+  const color = colorOf(habit.color);
+  const key = `${habit.id}|${today}`;
+  const doneToday = logged.has(key);
+  const todayMin = minutes[key] ?? 0;
+  const shownUp = days.filter((d) => logged.has(`${habit.id}|${d}`)).length;
+  const timed = habit.kind !== "habit";
+  const label = doneToday ? (timed ? `✓ ${todayMin}m` : "✓ Today") : KIND_META[habit.kind].verb;
+
+  return (
+    <li className="lift rounded-lg border border-line bg-surface p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            className={cn(
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-paper",
+              COLOR[color].bg,
+            )}
+          >
+            {createElement(habitIcon(habit.icon), { className: "h-4 w-4", "aria-hidden": true })}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate font-medium text-ink">{habit.title}</span>
+            {timed && (
+              <span className="block text-[11px] text-faint">{KIND_META[habit.kind].label}</span>
+            )}
+          </span>
+        </div>
+        <button
+          onClick={onAction}
+          aria-pressed={doneToday}
+          className={cn(
+            "press shrink-0 rounded-sm border px-3 py-1.5 text-sm font-medium transition-colors",
+            doneToday
+              ? cn("border-transparent text-paper", COLOR[color].bg)
+              : "border-line-strong text-muted hover:border-accent",
+          )}
+        >
+          {label}
+        </button>
+      </div>
+
+      <div className="mt-3 flex items-center gap-3">
+        <div className="flex gap-1">
+          {days.map((d) => {
+            const on = logged.has(`${habit.id}|${d}`);
+            return (
+              <span
+                key={d}
+                title={d}
+                className={cn(
+                  "h-3.5 w-3.5 rounded-[3px]",
+                  on ? COLOR[color].bg : "bg-line",
+                  d === today && "ring-1 ring-accent ring-offset-1",
+                )}
+              />
+            );
+          })}
+        </div>
+        <span className="ml-auto text-[11px] text-faint">
+          {shownUp} of {GRID_DAYS} days
+        </span>
+      </div>
+    </li>
   );
 }
 

@@ -13,7 +13,9 @@ from fastapi import FastAPI, HTTPException
 load_dotenv()
 
 from .engine.schedule import plan
+from .llm import goals as llm_goals
 from .llm import parse as llm_parse
+from .llm import patterns as llm_patterns
 from .llm import reflect as llm_reflect
 from .models import ScheduleRequest, ScheduleResponse
 
@@ -49,3 +51,17 @@ def reflect(req: llm_reflect.ReflectRequest) -> llm_reflect.ReflectResponse:
     if not llm_reflect.is_configured():
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY not configured")
     return llm_reflect.reflect_day(req)
+
+
+@app.post("/suggest-goals", response_model=llm_goals.SuggestGoalsResponse)
+def suggest_goals(req: llm_goals.SuggestGoalsRequest) -> llm_goals.SuggestGoalsResponse:
+    """Onboarding: propose goals grouping tiny habits. Always returns a usable
+    set — falls back to a deterministic starter map when the LLM is unreachable."""
+    return llm_goals.suggest_goals(req)
+
+
+@app.post("/patterns", response_model=llm_patterns.PatternsResponse)
+def patterns(req: llm_patterns.PatternsRequest) -> llm_patterns.PatternsResponse:
+    """Gentle, data-backed observations over the last fortnight. Calm by
+    contract; deterministic fallback so insights never error at the user."""
+    return llm_patterns.analyze_patterns(req)
