@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { createElement, useCallback, useMemo, useRef, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Pencil, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -95,6 +95,7 @@ export function HabitsClient({
     return m;
   });
   const [creating, setCreating] = useState(false);
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [onboarding, setOnboarding] = useState(false);
   const [timerHabit, setTimerHabit] = useState<Habit | null>(null);
   const [workoutHabit, setWorkoutHabit] = useState<Habit | null>(null);
@@ -160,6 +161,49 @@ export function HabitsClient({
       }
     },
     [supabase, userId, habits.length, toast],
+  );
+
+  const updateHabit = useCallback(
+    async (
+      habit: Habit,
+      draft: { title: string; icon: string; color: HabitColor; kind: HabitKind },
+    ) => {
+      setEditingHabit(null);
+      const prev = { ...habit };
+      setHabits((hs) => hs.map((h) => (h.id === habit.id ? { ...h, ...draft } : h)));
+      const { error } = await supabase
+        .from("habits")
+        .update({
+          title: draft.title,
+          icon: draft.icon,
+          color: draft.color,
+          kind: draft.kind,
+        })
+        .eq("id", habit.id);
+      if (error) {
+        setHabits((hs) => hs.map((h) => (h.id === habit.id ? prev : h)));
+        toast("Couldn't save — nothing lost, try again.");
+      } else {
+        toast("Saved.", "accent");
+      }
+    },
+    [supabase, toast],
+  );
+
+  // Deleting a habit takes its check-ins with it (habit_logs cascades).
+  const deleteHabit = useCallback(
+    async (habit: Habit) => {
+      setEditingHabit(null);
+      setHabits((hs) => hs.filter((h) => h.id !== habit.id));
+      const { error } = await supabase.from("habits").delete().eq("id", habit.id);
+      if (error) {
+        setHabits((hs) => [...hs, habit].sort((a, b) => a.position - b.position));
+        toast("Couldn't delete — try again.");
+      } else {
+        toast("Deleted.");
+      }
+    },
+    [supabase, toast],
   );
 
   const onOnboarded = useCallback((newGoals: Goal[], newHabits: Habit[]) => {
@@ -257,7 +301,7 @@ export function HabitsClient({
                 </h2>
                 <ul className="flex flex-col gap-3">
                   {items.map((h) => (
-                    <HabitTile key={h.id} habit={h} onAction={actionFor(h)} {...tileProps} />
+                    <HabitTile key={h.id} habit={h} onAction={actionFor(h)} onEdit={() => setEditingHabit(h)} {...tileProps} />
                   ))}
                 </ul>
               </section>
@@ -271,7 +315,7 @@ export function HabitsClient({
               )}
               <ul className="flex flex-col gap-3">
                 {groups.ungrouped.map((h) => (
-                  <HabitTile key={h.id} habit={h} onAction={actionFor(h)} {...tileProps} />
+                  <HabitTile key={h.id} habit={h} onAction={actionFor(h)} onEdit={() => setEditingHabit(h)} {...tileProps} />
                 ))}
               </ul>
             </section>
@@ -287,7 +331,16 @@ export function HabitsClient({
         </div>
       )}
 
-      {creating && <CreateHabit onClose={() => setCreating(false)} onCreate={addHabit} />}
+      {creating && <HabitSheet onClose={() => setCreating(false)} onSubmit={addHabit} />}
+      {editingHabit && (
+        <HabitSheet
+          key={editingHabit.id}
+          initial={editingHabit}
+          onClose={() => setEditingHabit(null)}
+          onSubmit={(draft) => void updateHabit(editingHabit, draft)}
+          onDelete={() => void deleteHabit(editingHabit)}
+        />
+      )}
 
       {onboarding && (
         <GoalOnboard
@@ -333,6 +386,7 @@ function HabitTile({
   logged,
   minutes,
   onAction,
+  onEdit,
 }: {
   habit: Habit;
   today: string;
@@ -340,6 +394,7 @@ function HabitTile({
   logged: Set<string>;
   minutes: Record<string, number>;
   onAction: () => void;
+  onEdit: () => void;
 }) {
   const color = colorOf(habit.color);
   const key = `${habit.id}|${today}`;
@@ -368,18 +423,28 @@ function HabitTile({
             )}
           </span>
         </div>
-        <button
-          onClick={onAction}
-          aria-pressed={doneToday}
-          className={cn(
-            "press shrink-0 rounded-sm border px-3 py-1.5 text-sm font-medium transition-colors",
-            doneToday
-              ? cn("border-transparent text-paper", COLOR[color].bg)
-              : "border-line-strong text-muted hover:border-accent",
-          )}
-        >
-          {label}
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            onClick={onAction}
+            aria-pressed={doneToday}
+            className={cn(
+              "press rounded-sm border px-3 py-1.5 text-sm font-medium transition-colors",
+              doneToday
+                ? cn("border-transparent text-paper", COLOR[color].bg)
+                : "border-line-strong text-muted hover:border-accent",
+            )}
+          >
+            {label}
+          </button>
+          <button
+            onClick={onEdit}
+            aria-label={`Edit ${habit.title}`}
+            title="Edit"
+            className="rounded-sm p-2 text-faint transition-colors hover:text-ink"
+          >
+            <Pencil className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        </div>
       </div>
 
       <div className="mt-3 flex items-center gap-3">
@@ -407,20 +472,31 @@ function HabitTile({
   );
 }
 
-function CreateHabit({
+// One sheet for both creating and editing a habit — same fields, so the two
+// flows can never drift apart. `initial` switches it into edit mode (adds Save
+// + Delete); its absence means a fresh habit.
+function HabitSheet({
+  initial,
   onClose,
-  onCreate,
+  onSubmit,
+  onDelete,
 }: {
+  initial?: Habit;
   onClose: () => void;
-  onCreate: (d: { title: string; icon: string; color: HabitColor; kind: HabitKind }) => void;
+  onSubmit: (d: { title: string; icon: string; color: HabitColor; kind: HabitKind }) => void;
+  onDelete?: () => void;
 }) {
-  const [title, setTitle] = useState("");
-  const [icon, setIcon] = useState(HABIT_ICON_KEYS[0]);
-  const [color, setColor] = useState<HabitColor>("sage");
-  const [kind, setKind] = useState<HabitKind>("habit");
+  const editing = Boolean(initial);
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [icon, setIcon] = useState(initial?.icon ?? HABIT_ICON_KEYS[0]);
+  const [color, setColor] = useState<HabitColor>(
+    (initial ? colorOf(initial.color) : "sage") as HabitColor,
+  );
+  const [kind, setKind] = useState<HabitKind>(initial?.kind ?? "habit");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
-    <Sheet open onClose={onClose} title="New habit">
+    <Sheet open onClose={onClose} title={editing ? "Edit habit" : "New habit"}>
       <div className="flex flex-col gap-4">
         <label className="space-y-1.5">
           <span className="text-sm text-muted">What would you like to return to?</span>
@@ -505,15 +581,44 @@ function CreateHabit({
           </div>
         </div>
 
+        {editing && onDelete && (
+          <div className="border-t border-line pt-3">
+            {confirmDelete ? (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+                <span>Delete this habit? Its check-in history goes too.</span>
+                <button
+                  onClick={onDelete}
+                  className="rounded-sm border border-line-strong px-2 py-1 font-medium text-ink hover:border-accent"
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="rounded-sm px-2 py-1 text-faint hover:text-ink"
+                >
+                  Keep
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="text-xs text-faint underline underline-offset-4 hover:text-ink"
+              >
+                delete this habit
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button
             disabled={!title.trim()}
-            onClick={() => onCreate({ title: title.trim(), icon, color, kind })}
+            onClick={() => onSubmit({ title: title.trim(), icon, color, kind })}
           >
-            Add
+            {editing ? "Save" : "Add"}
           </Button>
         </div>
       </div>

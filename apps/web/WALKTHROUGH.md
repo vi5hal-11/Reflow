@@ -62,9 +62,24 @@ Open http://localhost:3000 and sign in (magic link to your email).
 - [ ] **Reflection** — in the evening (or temporarily set working-hours end near
       now), the "close the day" reflection appears.
 
-## Calendar (optional — needs Google env + redirect URI registered)
-- [ ] Connect Google Calendar from Settings → your events show as fixed blocks →
-      Plan flows around them → your planned blocks appear on Google Calendar.
+## Optional day tasks (bonus work)
+- [ ] On /today, add something in **Optional today** → it appears instantly.
+      Check it off, then delete it with the ✕.
+- [ ] Confirm it never enters the "To place" tray, never gets a timeline block,
+      and doesn't move the day's completion ring or workload meter.
+- [ ] Leave one undone overnight → tomorrow it's simply gone. No roll-forward,
+      no badge, no guilt.
+
+## Habits — editing
+- [ ] On /habits, tap the ✏️ on a habit → rename it, change its icon, colour or
+      type → Save.
+- [ ] In the same sheet, **delete this habit** → confirm → it goes, and its
+      check-in history goes with it.
+
+## Navigation
+- [ ] On a phone, the bottom bar shows Today · Inbox · Habits · Settings ·
+      **More**. Tap **More** → Projects, Week, Focus, Journal, Progress.
+- [ ] The reflection ("close the day") is reachable any time, not just evening.
 
 ## Mobile / PWA (use a phone or DevTools device mode)
 - [ ] Bottom tab bar (Today / Inbox / Settings); capture reachable one-handed.

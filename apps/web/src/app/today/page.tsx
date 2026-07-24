@@ -1,9 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCalendarStatus } from "@/lib/calendar/status";
 import {
   dayTaskColumns,
-  type DayCalendarEvent,
   type DayProfile,
   type DayTask,
   type MomentumDay,
@@ -63,13 +61,16 @@ export default async function TodayPage() {
       is_big3: false,
     })
     .lt("planned_date", today)
-    .in("status", ["todo", "scheduled"]);
+    .in("status", ["todo", "scheduled"])
+    // Optional tasks belong to their day only — an unfinished one simply
+    // passes with the day rather than following the user forward.
+    .eq("is_optional", false);
 
   const momentumSince = new Date(nowMs - 27 * 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
 
-  const [{ data: tasks }, { data: events }, { data: plan }, { data: momentum }, calendarStatus] =
+  const [{ data: tasks }, { data: plan }, { data: momentum }] =
     await Promise.all([
     supabase
       .from("tasks")
@@ -84,11 +85,6 @@ export default async function TodayPage() {
       )
       .order("created_at", { ascending: true }),
     supabase
-      .from("calendar_events")
-      .select("id, title, start, end, is_busy")
-      .gte("start", windowStart)
-      .lte("start", windowEnd),
-    supabase
       .from("daily_plans")
       .select("id, plan_date, big3_task_ids")
       .eq("plan_date", today)
@@ -98,7 +94,6 @@ export default async function TodayPage() {
       .select("metric_date, active")
       .gte("metric_date", momentumSince)
       .order("metric_date", { ascending: true }),
-    getCalendarStatus(user.id),
   ]);
 
   const fallbackProfile: DayProfile = {
@@ -114,10 +109,8 @@ export default async function TodayPage() {
       userId={user.id}
       profile={(profile as DayProfile | null) ?? fallbackProfile}
       initialTasks={(tasks ?? []) as DayTask[]}
-      calendarEvents={(events ?? []) as DayCalendarEvent[]}
       initialBig3Ids={(plan?.big3_task_ids as string[] | null) ?? []}
       initialMomentum={(momentum ?? []) as MomentumDay[]}
-      calendarStatus={calendarStatus}
     />
   );
 }

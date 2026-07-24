@@ -42,11 +42,11 @@ New Project → import this repo → set **Root Directory** to `apps/web`. Env v
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_…` |
 | `NEXT_PUBLIC_SITE_URL` | your Vercel domain, e.g. `https://reflow.vercel.app` |
 | `SCHEDULER_URL` | the scheduler URL from step 1 |
-| `SUPABASE_SECRET_KEY` | `sb_secret_…` (rotate first — see step 4) |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | for calendar sync (optional) |
+That's the whole list. The web app needs **no secret key and no Google
+credentials** — it reaches Supabase only through RLS-scoped user sessions.
 
-Deploy. The app is usable the moment this is up — the scheduler/LLM/calendar
-all degrade gracefully if a var is missing.
+Deploy. The app is usable the moment this is up — the scheduler and LLM edges
+both degrade gracefully if a var is missing.
 
 ---
 
@@ -54,9 +54,9 @@ all degrade gracefully if a var is missing.
 
 - **Supabase Auth** (dashboard → Authentication → URL Configuration): add your
   Vercel domain to **Site URL** and **Redirect URLs** (`https://…/auth/callback`).
-- **Google Cloud Console** (if using calendar): add
-  `https://<your-domain>/api/calendar/callback` as an authorized redirect URI,
-  and ensure the **Google Calendar API** is enabled.
+- **Google sign-in**: in Google Cloud Console, the OAuth client's authorized
+  redirect URI must include `https://<project-ref>.supabase.co/auth/v1/callback`
+  (Supabase handles the round-trip; the app itself needs no Google env).
 
 ---
 

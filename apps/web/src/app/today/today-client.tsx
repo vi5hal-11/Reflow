@@ -13,10 +13,9 @@ import { Meter, Ring } from "@/components/ui/ring";
 import { SunHorizon } from "@/components/ui/sun-horizon";
 import { Welcome } from "@/components/onboarding/welcome";
 import { Button } from "@/components/ui/button";
-import type { CalendarStatus, CalendarSyncResult } from "@/lib/calendar/types";
 import {
+  dayTaskColumns,
   energyTags,
-  type DayCalendarEvent,
   type DayProfile,
   type DayTask,
   type EnergyTag,
@@ -106,18 +105,14 @@ export function TodayClient({
   userId,
   profile,
   initialTasks,
-  calendarEvents,
   initialBig3Ids,
   initialMomentum,
-  calendarStatus,
 }: {
   userId: string;
   profile: DayProfile;
   initialTasks: DayTask[];
-  calendarEvents: DayCalendarEvent[];
   initialBig3Ids: string[];
   initialMomentum: MomentumDay[];
-  calendarStatus: CalendarStatus;
 }) {
   const supabase = createClient();
   const today = localToday();
@@ -138,6 +133,12 @@ export function TodayClient({
   const [dragStart, setDragStart] = useState<number | null>(null);
   const dragStartRef = useRef<number | null>(null);
   const [ritualDismissed, setRitualDismissed] = useState(false);
+  const [optionalText, setOptionalText] = useState("");
+  // A tap on a just-added optional task can land before its insert returns.
+  // These replay that intent once the real row arrives, so a fast tap on a
+  // slow connection is never silently lost.
+  const pendingOptionalStatus = useRef<Map<string, DayTask["status"]>>(new Map());
+  const discardedOptional = useRef<Set<string>>(new Set());
   const [wildcards, setWildcards] = useState<PlanWildcard[]>([]);
   const [overflowIds, setOverflowIds] = useState<Set<string>>(new Set());
   const [planning, setPlanning] = useState(false);
@@ -151,21 +152,9 @@ export function TodayClient({
   } | null>(null);
   const [reflecting, setReflecting] = useState(false);
   const [reflectNotice, setReflectNotice] = useState<string | null>(null);
-  // Calendar events live in state so a sync can replace them; the server
-  // prop is only the first paint.
-  const [calEvents, setCalEvents] = useState<DayCalendarEvent[]>(calendarEvents);
-  const [calendar, setCalendar] = useState<CalendarStatus>(calendarStatus);
-  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(
-    calendarStatus.connected ? calendarStatus.lastSyncedAt : null,
-  );
-  const [syncedLabel, setSyncedLabel] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [calendarNotice, setCalendarNotice] = useState<string | null>(null);
   // Auto re-flow only after the user has planned once, at most once a minute.
   const hasPlannedRef = useRef(false);
   const lastReflowRef = useRef(0);
-  // Auto calendar sync at most once per five minutes (mount + tab focus).
-  const lastCalSyncRef = useRef(0);
 
   useEffect(() => {
     const tick = () => setNow(nowMinutes());
@@ -185,29 +174,6 @@ export function TodayClient({
       void supabase.from("profiles").update({ timezone: browserTz }).eq("id", userId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // A failed OAuth round-trip lands back here with ?calendar_error=1.
-  // Read window.location in an effect (no Suspense boundary needed) and
-  // strip the param so a refresh doesn't repeat the notice.
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    if (!url.searchParams.has("calendar_error")) return;
-    url.searchParams.delete("calendar_error");
-    window.history.replaceState(
-      window.history.state,
-      "",
-      url.pathname + url.search + url.hash,
-    );
-    // Deferred so the effect body itself never sets state synchronously.
-    const t = setTimeout(
-      () =>
-        setCalendarNotice(
-          "couldn't connect the calendar — nothing lost, try again whenever",
-        ),
-      0,
-    );
-    return () => clearTimeout(t);
   }, []);
 
   const patchTask = useCallback((id: string, patch: Partial<DayTask>) => {
@@ -307,122 +273,20 @@ export function TodayClient({
     return () => clearTimeout(t);
   }, [planDay]);
 
-  const calendarConnected = calendar.available && calendar.connected;
 
-  // Pull external events (local yesterday → +7 days) and, if anything out
-  // there changed, let the plan quietly re-flow around it. Failures are
-  // silent — the cached events stand and the day view never degrades.
-  const syncCalendar = useCallback(
-    async (auto: boolean) => {
-      if (auto && Date.now() - lastCalSyncRef.current < 5 * 60_000) return;
-      lastCalSyncRef.current = Date.now();
-      if (!auto) setSyncing(true);
-      try {
-        const windowStart = new Date();
-        windowStart.setDate(windowStart.getDate() - 1);
-        windowStart.setHours(0, 0, 0, 0);
-        const windowEnd = new Date();
-        windowEnd.setDate(windowEnd.getDate() + 8);
-        windowEnd.setHours(0, 0, 0, 0);
-        const res = await fetch("/api/calendar/sync", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            windowStart: windowStart.toISOString(),
-            windowEnd: windowEnd.toISOString(),
-          }),
-        });
-        if (res.status === 409) {
-          // The Google link is gone (revoked elsewhere). Quietly show the
-          // connect affordance again; cached events stand.
-          setCalendar((c) =>
-            c.available ? { available: true, connected: false } : c,
-          );
-          return;
-        }
-        if (!res.ok) return; // 503 and friends — silent, cached events stand
-        const data = (await res.json()) as CalendarSyncResult;
-        setCalEvents(data.events);
-        setLastSyncedAt(new Date().toISOString());
-        // planDay's own 60s throttle keeps this from double-firing with the
-        // focus-driven re-flow above.
-        if (data.changed) void planDay(true);
-      } catch {
-        // silent — the cached events stand
-      } finally {
-        if (!auto) setSyncing(false);
-      }
-    },
-    [planDay],
+  const fixedBlocks = useMemo(
+    () =>
+      tasks
+        .filter((t) => t.is_fixed && t.fixed_start && isLocalToday(t.fixed_start))
+        .map((t) => ({
+          key: `task-${t.id}`,
+          task: t as DayTask | null,
+          title: t.title,
+          start: toMinutes(t.fixed_start!),
+          end: toMinutes(t.fixed_start!) + (t.estimated_minutes ?? DEFAULT_FIXED_MINUTES),
+        })),
+    [tasks],
   );
-
-  useEffect(() => {
-    if (!calendarConnected) return;
-    const mountSync = setTimeout(() => void syncCalendar(true), 0);
-    const onFocus = () => void syncCalendar(true);
-    window.addEventListener("focus", onFocus);
-    return () => {
-      clearTimeout(mountSync);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [calendarConnected, syncCalendar]);
-
-  // The "synced · 2m ago" whisper — computed on a timer, never at render.
-  // (Rendering also guards on lastSyncedAt, so a stale label never shows.)
-  useEffect(() => {
-    if (!lastSyncedAt) return;
-    const compute = () => {
-      const mins = Math.max(
-        0,
-        Math.floor((Date.now() - new Date(lastSyncedAt).getTime()) / 60_000),
-      );
-      if (mins < 1) setSyncedLabel("just now");
-      else if (mins < 60) setSyncedLabel(`${mins}m ago`);
-      else setSyncedLabel(`${Math.floor(mins / 60)}h ago`);
-    };
-    const first = setTimeout(compute, 0);
-    const t = setInterval(compute, 30_000);
-    return () => {
-      clearTimeout(first);
-      clearInterval(t);
-    };
-  }, [lastSyncedAt]);
-
-  const disconnectCalendar = useCallback(async () => {
-    try {
-      const res = await fetch("/api/calendar/disconnect", { method: "POST" });
-      if (res.ok) {
-        setCalendar((c) =>
-          c.available ? { available: true, connected: false } : c,
-        );
-        setLastSyncedAt(null);
-      }
-    } catch {
-      // silent — disconnecting can be retried anytime
-    }
-  }, []);
-
-  const fixedBlocks = useMemo(() => {
-    const taskBlocks = tasks
-      .filter((t) => t.is_fixed && t.fixed_start && isLocalToday(t.fixed_start))
-      .map((t) => ({
-        key: `task-${t.id}`,
-        task: t as DayTask | null,
-        title: t.title,
-        start: toMinutes(t.fixed_start!),
-        end: toMinutes(t.fixed_start!) + (t.estimated_minutes ?? DEFAULT_FIXED_MINUTES),
-      }));
-    const eventBlocks = calEvents
-      .filter((e) => e.is_busy && isLocalToday(e.start))
-      .map((e) => ({
-        key: `event-${e.id}`,
-        task: null as DayTask | null,
-        title: e.title ?? "Busy",
-        start: toMinutes(e.start),
-        end: Math.max(toMinutes(e.end), toMinutes(e.start) + 15),
-      }));
-    return [...taskBlocks, ...eventBlocks];
-  }, [tasks, calEvents]);
 
   const placed = useMemo(
     () =>
@@ -441,6 +305,7 @@ export function TodayClient({
       tasks.filter(
         (t) =>
           !t.is_fixed &&
+          !t.is_optional &&
           (t.status === "todo" || t.status === "rolled") &&
           t.planned_date === today,
       ),
@@ -452,12 +317,21 @@ export function TodayClient({
       tasks.filter(
         (t) =>
           !t.is_fixed &&
+          !t.is_optional &&
           t.status === "done" &&
           !t.scheduled_start &&
           t.planned_date === today,
       ),
     [tasks, today],
   );
+
+  // Optional ("bonus") work for today — its own calm list, kept out of the
+  // tray, the timeline, the day's load, and the roll-forward.
+  const optional = useMemo(
+    () => tasks.filter((t) => t.is_optional && t.planned_date === today),
+    [tasks, today],
+  );
+  const optionalDone = optional.filter((t) => t.status === "done").length;
 
   const gaps = useMemo(() => {
     const busy: Interval[] = [
@@ -592,6 +466,103 @@ export function TodayClient({
       }
     },
     [supabase, patchTask, planDay, recordCompletion, userId],
+  );
+
+  // --- optional ("bonus") tasks ------------------------------------------
+  // Deliberately lighter than the main task flow: no scheduling, no re-flow,
+  // no estimate learning. Finishing one still counts as showing up.
+  const addOptional = useCallback(async () => {
+    const title = optionalText.trim();
+    if (!title) return;
+    setOptionalText("");
+    const tempId = `temp-${crypto.randomUUID()}`;
+    const optimistic: DayTask = {
+      id: tempId,
+      title,
+      status: "todo",
+      estimated_minutes: null,
+      energy_tag: null,
+      priority: 2,
+      deadline: null,
+      planned_date: today,
+      is_fixed: false,
+      fixed_start: null,
+      is_big3: false,
+      is_optional: true,
+      scheduled_start: null,
+      scheduled_end: null,
+      recurrence: null,
+    };
+    setTasks((prev) => [...prev, optimistic]);
+
+    const { data, error } = await supabase
+      .from("tasks")
+      .insert({
+        user_id: userId,
+        title,
+        status: "todo",
+        planned_date: today,
+        is_optional: true,
+        source: "manual",
+      })
+      .select(dayTaskColumns)
+      .single();
+    if (error || !data) {
+      setTasks((prev) => prev.filter((t) => t.id !== tempId));
+      setOptionalText(title);
+      return;
+    }
+    const saved = data as DayTask;
+
+    // Deleted while the insert was in flight — honour that, don't resurrect it.
+    if (discardedOptional.current.has(tempId)) {
+      discardedOptional.current.delete(tempId);
+      pendingOptionalStatus.current.delete(tempId);
+      setTasks((prev) => prev.filter((t) => t.id !== tempId));
+      await supabase.from("tasks").delete().eq("id", saved.id);
+      return;
+    }
+
+    // Completed while the insert was in flight — keep it and persist.
+    const pending = pendingOptionalStatus.current.get(tempId);
+    pendingOptionalStatus.current.delete(tempId);
+    const status = pending ?? saved.status;
+    setTasks((prev) => prev.map((t) => (t.id === tempId ? { ...saved, status } : t)));
+    if (pending && pending !== saved.status) {
+      await supabase.from("tasks").update({ status: pending }).eq("id", saved.id);
+    }
+  }, [optionalText, supabase, userId, today]);
+
+  const toggleOptionalDone = useCallback(
+    async (task: DayTask) => {
+      const wasDone = task.status === "done";
+      const nextStatus = wasDone ? "todo" : "done";
+      patchTask(task.id, { status: nextStatus });
+      if (task.id.startsWith("temp-")) {
+        pendingOptionalStatus.current.set(task.id, nextStatus);
+        return;
+      }
+      const { error } = await supabase
+        .from("tasks")
+        .update({ status: nextStatus })
+        .eq("id", task.id);
+      if (error) patchTask(task.id, { status: task.status });
+      else if (!wasDone) recordCompletion(task);
+    },
+    [supabase, patchTask, recordCompletion],
+  );
+
+  const deleteOptional = useCallback(
+    async (task: DayTask) => {
+      setTasks((prev) => prev.filter((t) => t.id !== task.id));
+      if (task.id.startsWith("temp-")) {
+        discardedOptional.current.add(task.id);
+        return;
+      }
+      const { error } = await supabase.from("tasks").delete().eq("id", task.id);
+      if (error) setTasks((prev) => [...prev, task]);
+    },
+    [supabase],
   );
 
   const moveToLater = useCallback(
@@ -757,10 +728,13 @@ export function TodayClient({
     ([, f]) => f > 1.05,
   );
 
-  // Day at a glance (v3): completion ring + a gentle workload meter.
+  // Day at a glance (v3): completion ring + a gentle workload meter. Optional
+  // work is excluded on purpose — bonus items must never inflate the day's
+  // load or drag down its completion ratio.
   const dayFlexible = tasks.filter(
     (t) =>
       !t.is_fixed &&
+      !t.is_optional &&
       (t.status === "todo" ||
         t.status === "rolled" ||
         t.status === "scheduled" ||
@@ -954,39 +928,9 @@ export function TodayClient({
         <div>
           <span className="text-sm text-faint">Reflow</span>
           <h1 className="font-display text-3xl tracking-tight text-ink">{dateLabel}</h1>
-          {calendarConnected && lastSyncedAt && syncedLabel && (
-            <p className="text-[11px] text-faint dark:text-faint">
-              calendar synced · {syncedLabel}
-            </p>
-          )}
         </div>
         <nav className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 text-sm text-faint">
           <ViewSwitcher />
-          {calendar.available && !calendar.connected && (
-            <a
-              href="/api/calendar/connect"
-              className="underline underline-offset-4 hover:text-muted"
-            >
-              connect Google Calendar
-            </a>
-          )}
-          {calendar.available && calendar.connected && (
-            <span className="flex items-center gap-1.5 text-xs">
-              <span
-                className="max-w-36 truncate"
-                title={calendar.googleEmail ?? undefined}
-              >
-                {calendar.googleEmail ?? "Google Calendar"}
-              </span>
-              <button
-                onClick={() => void syncCalendar(false)}
-                disabled={syncing}
-                className="underline underline-offset-4 hover:text-muted disabled:opacity-60"
-              >
-                {syncing ? "syncing…" : "sync"}
-              </button>
-            </span>
-          )}
           <Link href="/inbox" className="hidden underline underline-offset-4 hover:text-muted sm:inline">
             Inbox
           </Link>
@@ -1111,12 +1055,6 @@ export function TodayClient({
           {paddedTags
             .map(([tag, f]) => `${tag} +${Math.round((f - 1) * 100)}%`)
             .join(" · ")}
-        </p>
-      )}
-
-      {calendarNotice && (
-        <p className="rounded-lg border border-line px-4 py-2 text-sm text-muted dark:border-line">
-          {calendarNotice}
         </p>
       )}
 
@@ -1470,8 +1408,85 @@ export function TodayClient({
         </aside>
       </div>
 
-      {/* End of day — one kind look back, never a report card */}
-      {(eveningReached || reflection) && (
+      {/* Optional today — bonus work. Never scheduled, never rolled, never
+          owed: leaving one undone is the day moving on, not a miss (§7). */}
+      <section aria-label="Optional today" className="space-y-2">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-sm font-medium text-muted">Optional today</h2>
+          <span className="text-xs text-faint">
+            {optional.length === 0
+              ? "bonus — nothing owed here"
+              : `${optionalDone} of ${optional.length} done`}
+          </span>
+        </div>
+
+        {optional.length > 0 && (
+          <ul className="flex flex-col gap-1.5">
+            {optional.map((t) => (
+              <li
+                key={t.id}
+                className="group flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm"
+              >
+                <button
+                  onClick={() => void toggleOptionalDone(t)}
+                  aria-label={t.status === "done" ? "Mark not done" : "Mark done"}
+                  className={cn(
+                    "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+                    t.status === "done"
+                      ? "border-ink bg-ink text-paper"
+                      : "border-line-strong",
+                  )}
+                >
+                  {t.status === "done" && (
+                    <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                  )}
+                </button>
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 truncate",
+                    t.status === "done" && "text-faint line-through",
+                  )}
+                >
+                  {t.title}
+                </span>
+                <button
+                  onClick={() => void deleteOptional(t)}
+                  aria-label={`Delete ${t.title}`}
+                  title="Delete"
+                  // Tap-visible on touch; hover-revealed on desktop.
+                  className="shrink-0 rounded-sm px-1 text-faint transition-opacity hover:text-ink focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void addOptional();
+          }}
+        >
+          <input
+            value={optionalText}
+            onChange={(e) => setOptionalText(e.target.value)}
+            placeholder="add something optional…"
+            aria-label="Add an optional task for today"
+            className="w-full rounded-lg border border-dashed border-line-strong bg-transparent px-3 py-2 text-sm outline-none placeholder:text-faint focus:border-accent"
+          />
+        </form>
+
+        <p className="text-[11px] leading-relaxed text-faint">
+          Nice-to-haves for today. They&apos;re never scheduled and never roll
+          over — leaving one undone costs nothing.
+        </p>
+      </section>
+
+      {/* One kind look back, never a report card. Always reachable — waiting
+          for evening hid it from anyone whose day ends at a different hour. */}
+      {(
         <section aria-label="Reflection" className="space-y-2">
           {reflection ? (
             <div className="space-y-1.5 rounded-lg border border-line px-4 py-3 text-sm dark:border-line">
@@ -1507,17 +1522,6 @@ export function TodayClient({
         >
           {todayIsRest ? "rest day ✓ — undo" : "mark today a rest day"}
         </button>
-        {calendarConnected && (
-          <>
-            {" · "}
-            <button
-              onClick={() => void disconnectCalendar()}
-              className="underline underline-offset-2 hover:text-muted"
-            >
-              disconnect calendar
-            </button>
-          </>
-        )}
       </p>
     </main>
   );

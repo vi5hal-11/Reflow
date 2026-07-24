@@ -49,6 +49,8 @@ Migrations live in `supabase/migrations/` and are applied to the Supabase projec
 
 **All CLAUDE.md §9 MVP phases (0–6, minus payments) are built.** Remaining founder setup: env keys (see below).
 
-To enable calendar sync, set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (a Google Cloud OAuth web client with redirect URI `{NEXT_PUBLIC_SITE_URL}/api/calendar/callback`, Calendar API enabled) and `SUPABASE_SECRET_KEY` in the web app's environment. Without them the app runs exactly in its Phase 3 shape.
+**Google Calendar sync was removed on 2026-07-23** (founder decision — see `DECISIONS.md`). It carried an OAuth round-trip and a service-role token table for a capability the core loop never needed, so the web app now requires **no Google credentials and no Supabase secret key** at runtime. `SUPABASE_SECRET_KEY` is used only by the signed-in Playwright suite to seed a test user.
+
+Since then: **projects** (create/rename/archive/colour, assign from a task, filter the inbox), **optional day tasks** (bonus work that is never scheduled and never rolls forward), **habit editing and deletion**, and a mobile **More** sheet surfacing Projects · Week · Focus · Journal · Progress.
 
 To enable parse enrichment and end-of-day reflection, set `GEMINI_API_KEY` (free at [aistudio.google.com](https://aistudio.google.com), no card; optionally `GEMINI_MODEL`, default `gemini-2.5-flash`) in the scheduler service environment. Without it the app still works — captures simply stay as typed and reflection stays quiet.

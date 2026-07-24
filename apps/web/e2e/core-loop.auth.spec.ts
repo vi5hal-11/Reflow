@@ -113,6 +113,40 @@ test.describe("signed-in core loop", () => {
     await expect(page.getByText(/overdue/i)).toHaveCount(0);
   });
 
+  test("optional tasks: add, complete, delete — never scheduled, never owed", async ({
+    authedPage: page,
+  }) => {
+    await page.goto("/today");
+    const section = page.locator("section[aria-label='Optional today']");
+    await expect(section).toBeVisible();
+    await expect(section).toContainText("bonus — nothing owed here");
+
+    // Add one.
+    const title = `E2E bonus ${randomUUID().slice(0, 6)}`;
+    const box = section.getByPlaceholder(/add something optional/);
+    await box.fill(title);
+    await box.press("Enter");
+
+    const row = section.locator("li").filter({ hasText: title });
+    await expect(row).toBeVisible();
+
+    // It is bonus work: it never enters the tray the scheduler places from.
+    await expect(
+      page.locator("aside[aria-label='To place'] li").filter({ hasText: title }),
+    ).toHaveCount(0);
+
+    // Complete it.
+    await row.getByRole("button", { name: "Mark done" }).click();
+    await expect(section).toContainText("1 of 1 done");
+
+    // Delete it.
+    await row.getByRole("button", { name: `Delete ${title}` }).click();
+    await expect(section.locator("li").filter({ hasText: title })).toHaveCount(0);
+
+    // And nothing about optional work reads as overdue.
+    await expect(page.getByText(/overdue/i)).toHaveCount(0);
+  });
+
   test("settings exposes the working-hours + energy controls the scheduler reads", async ({
     authedPage: page,
   }) => {

@@ -76,21 +76,16 @@ export type DayTask = {
   is_fixed: boolean;
   fixed_start: string | null;
   is_big3: boolean;
+  // Bonus work for one particular day: never scheduled onto the timeline,
+  // never rolled forward, never overdue (CLAUDE.md §7).
+  is_optional: boolean;
   scheduled_start: string | null;
   scheduled_end: string | null;
   recurrence: RecurrenceFreq | null;
 };
 
 export const dayTaskColumns =
-  "id, title, status, estimated_minutes, energy_tag, priority, deadline, planned_date, is_fixed, fixed_start, is_big3, scheduled_start, scheduled_end, recurrence";
-
-export type DayCalendarEvent = {
-  id: string;
-  title: string | null;
-  start: string;
-  end: string;
-  is_busy: boolean;
-};
+  "id, title, status, estimated_minutes, energy_tag, priority, deadline, planned_date, is_fixed, fixed_start, is_big3, is_optional, scheduled_start, scheduled_end, recurrence";
 
 // jsonb clock-string ranges per energy tag, e.g. {"deep":["09:00-12:00"]}.
 // The client resolves these against its local day before calling /api/plan.

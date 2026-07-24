@@ -27,6 +27,9 @@ type TestFixtures = {
   authedPage: Page;
 };
 
+// Throws on a listUsers failure so the caller can retry — returning null here
+// would be indistinguishable from "no such user" and abort the whole run over
+// one transient blip on the worker's first admin call.
 async function findUserByEmail(
   admin: SupabaseClient,
   email: string,
@@ -34,7 +37,8 @@ async function findUserByEmail(
   const target = email.toLowerCase();
   for (let page = 1; page <= 10; page++) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
-    if (error || data.users.length === 0) return null;
+    if (error) throw error;
+    if (data.users.length === 0) return null;
     const match = data.users.find((u) => u.email?.toLowerCase() === target);
     if (match) return match.id;
     if (data.users.length < 200) return null;
@@ -43,28 +47,37 @@ async function findUserByEmail(
 }
 
 async function ensureTestUser(admin: SupabaseClient): Promise<string> {
-  const created = await admin.auth.admin.createUser({
-    email: TEST_EMAIL,
-    password: TEST_PASSWORD,
-    email_confirm: true,
-  });
-  if (created.data.user) return created.data.user.id;
+  let lastError = "unknown error";
 
-  // Likely "already registered" — find the row and normalize its credentials
-  // so a password change or unconfirmed state from a prior run can't wedge us.
-  const existing = await findUserByEmail(admin, TEST_EMAIL);
-  if (!existing) {
-    throw new Error(
-      `Could not create or find the E2E test user (${TEST_EMAIL}): ${
-        created.error?.message ?? "unknown error"
-      }`,
-    );
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const created = await admin.auth.admin.createUser({
+        email: TEST_EMAIL,
+        password: TEST_PASSWORD,
+        email_confirm: true,
+      });
+      if (created.data.user) return created.data.user.id;
+      lastError = created.error?.message ?? "unknown error";
+
+      // Already registered — find the row and normalize its credentials so a
+      // password change or unconfirmed state from a prior run can't wedge us.
+      const existing = await findUserByEmail(admin, TEST_EMAIL);
+      if (existing) {
+        await admin.auth.admin.updateUserById(existing, {
+          password: TEST_PASSWORD,
+          email_confirm: true,
+        });
+        return existing;
+      }
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
   }
-  await admin.auth.admin.updateUserById(existing, {
-    password: TEST_PASSWORD,
-    email_confirm: true,
-  });
-  return existing;
+
+  throw new Error(
+    `Could not create or find the E2E test user (${TEST_EMAIL}): ${lastError}`,
+  );
 }
 
 /** Browser-local today as YYYY-MM-DD — matches how the client writes planned_date. */

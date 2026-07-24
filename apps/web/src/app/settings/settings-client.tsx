@@ -93,11 +93,9 @@ function hourLabel(h: number): string {
 export function SettingsClient({
   userId,
   profile,
-  calendar,
 }: {
   userId: string;
   profile: DayProfile & { display_name: string | null };
-  calendar: import("@/lib/calendar/types").CalendarStatus;
 }) {
   const supabase = createClient();
   const toast = useToast();
@@ -160,8 +158,6 @@ export function SettingsClient({
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (tz) setTimezone(tz);
   };
-
-  const calendarConnected = calendar.available && calendar.connected;
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-10 px-6 py-10 pb-28 sm:pb-10">
@@ -326,47 +322,6 @@ export function SettingsClient({
           fills them, it just won&apos;t prefer them for that kind of work.
         </p>
       </section>
-
-      {/* Calendar */}
-      {calendar.available && (
-        <section className="space-y-3">
-          <SectionHeader>Calendar</SectionHeader>
-          {calendarConnected ? (
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
-              <span>
-                Connected
-                {calendar.connected && calendar.googleEmail
-                  ? ` as ${calendar.googleEmail}`
-                  : ""}
-                .
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    const res = await fetch("/api/calendar/disconnect", { method: "POST" });
-                    if (res.ok) {
-                      toast("Calendar disconnected.");
-                      window.location.reload();
-                    }
-                  } catch {
-                    toast("Couldn't disconnect — try again.");
-                  }
-                }}
-              >
-                disconnect
-              </Button>
-            </div>
-          ) : (
-            <a href="/api/calendar/connect">
-              <Button variant="quiet" size="sm">
-                Connect Google Calendar
-              </Button>
-            </a>
-          )}
-        </section>
-      )}
 
       {/* Data */}
       <section className="space-y-3">
