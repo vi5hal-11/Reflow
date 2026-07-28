@@ -116,6 +116,8 @@ export async function POST(request: Request) {
         // Optional tasks are bonus: the scheduler never places them, so they
         // can't crowd out required work or create overflow pressure.
         .eq("is_optional", false)
+        // Ideas and notes are kept, not planned — they never reach the engine.
+        .eq("kind", "task")
         .or(
           [
             `and(status.in.(todo,rolled),planned_date.eq.${date})`,

@@ -288,6 +288,30 @@ body {
   border-radius: 4px;
 }
 
+/* A captured item settling into place — the visual half of "Save & settle".
+   A short downward drift, never a bounce: things land, they don't spring. */
+@keyframes settle-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.settle-in {
+  animation: settle-in var(--dur-enter, 200ms) var(--ease-out) both;
+}
+
+/* Rows that leave a list (triage, delete) fade rather than vanish. */
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
 /* Motion floor: honor reduced-motion everywhere (DESIGN.md §4). */
 @media (prefers-reduced-motion: reduce) {
   *,

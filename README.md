@@ -69,11 +69,13 @@ For production, add your deployed origin to Supabase → Authentication → **UR
 
 ## What's built
 
-**Capture & inbox** — a one-second omnibox (text or voice) with optimistic capture; background LLM enrichment suggests an estimate, energy tag, deadline and project; keyboard triage (`t` today / `l` later / `x` drop), multi-select with bulk actions and undo, project filter chips, and a weekly resurfacing of items that have sat untouched. The edit sheet covers title, estimate, energy, project, deadline, repeat, reminder and a subtask checklist.
+**Capture & inbox** — a one-second omnibox (text or voice) with optimistic capture, and a considered capture sheet for when you already know what the thing is (type, plan-for-today, Big 3, in one motion). Every capture carries a **kind**: only a *task* can ever be scheduled — *ideas* and *notes* are kept out of the planner entirely, so they never crowd the day or read as overdue. Background LLM enrichment suggests an estimate, energy tag, deadline and project; keyboard triage (`t` today / `l` later / `x` drop), multi-select with bulk actions and undo, project filter chips, and a weekly resurfacing of items that have sat untouched. The edit sheet covers title, estimate, energy, project, deadline, repeat, reminder, per-task scheduling limits and a subtask checklist.
 
-**The day** — `/today` lays out a timeline around fixed blocks with a now-line, click-to-place and drag-to-reschedule, a **Daily Big 3** with a calm win banner, reserved wildcard breathing room, and overflow treated as an outcome rather than a failure. A day-at-a-glance ring and workload meter sit above it, plus **optional day tasks**: bonus work that is never scheduled, never counted in the day's load, and never rolled forward.
+**The day** — a **daily arc** shows how today is shaped by the energy hours you painted, solid up to now and dotted after. `/today` lays out a timeline around fixed blocks with a now-line, click-to-place and drag-to-reschedule, a **Daily Big 3** with a calm win banner, reserved wildcard breathing room, and overflow treated as an outcome rather than a failure. A day-at-a-glance ring and workload meter sit above it, plus **optional day tasks**: bonus work that is never scheduled, never counted in the day's load, and never rolled forward.
 
-**The scheduler** — a deterministic, greedy, energy-aware placement engine in FastAPI (Big 3 first, then deadline urgency, priority and FIFO), with **stable re-flow** that keeps still-valid blocks where they are and moves only what must move. ~0.5 ms for a 50-task day against a <50 ms budget. Re-flows silently on completion, placement and tab focus.
+**The scheduler** — a deterministic, greedy, energy-aware placement engine in FastAPI (Big 3 first, then deadline urgency, priority and FIFO), with **stable re-flow** that keeps still-valid blocks where they are and moves only what must move. ~0.5 ms for a 50-task day against a <50 ms budget. Re-flows silently on completion, placement and tab focus. It respects real constraints: **protected time** (recurring windows it may never plan into), **per-task limits** ("only schedule between 2 and 6"), and **daily caps** on deep work and total scheduled time — with the Big 3 always exempt.
+
+**Agenda & Review** — `/agenda` is a timed read of the day: everything scheduled with its clock time, done vs pending, and a now-rule between past and future. `/review` is the evening flow — how today went, what's carrying over (move one, move all, or let go), and tomorrow's Big 3, with a wider look back on Sundays.
 
 **No guilt, by construction** — soft roll-forward with a "no baggage" note and never an overdue badge; a 28-day momentum strip that dims but never resets; explicit rest days; comeback framing after a gap; estimate-vs-actual learning that transparently pads future plans; morning and evening rituals, and a reflection you can reach at any hour.
 
@@ -81,7 +83,7 @@ For production, add your deployed origin to Supabase → Authentication → **UR
 
 **Habits & wellness** — habits with a no-guilt 14-day grid (it dims, it never resets), full editing and deletion, a weather-metaphor mood check-in, daily journaling, a meditation timer, workout minute logging, a deterministic `/progress` page, AI-assisted goal onboarding, and gentle pattern insights. Deliberately single-player: no social, competition, XP or leaderboards.
 
-**Platform** — installable PWA (manifest, icons, OS share-target), a mobile tab bar with a **More** sheet (Projects · Week · Focus · Journal · Progress), instant navigation skeletons, a ⌘K command palette, Today/Week/Focus views, and one-click JSON + iCal export.
+**Platform** — installable PWA (manifest, icons, OS share-target), a mobile tab bar with a **More** sheet (Agenda · Review · Projects · Week · Focus · Journal · Progress), instant navigation skeletons, a ⌘K command palette, Today/Week/Focus views, and one-click JSON + iCal export.
 
 ## Testing
 

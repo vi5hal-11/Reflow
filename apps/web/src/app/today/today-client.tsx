@@ -2,16 +2,18 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { CommandBar } from "@/components/command/command-trigger";
 import { ViewSwitcher } from "@/components/app-shell/view-switcher";
 import { nextRecurringInsert } from "@/lib/recurrence";
-import { Check } from "lucide-react";
+import { Check, Plus } from "lucide-react";
 import { ENERGY, EnergyDot } from "@/components/ui/energy";
 import { Meter, Ring } from "@/components/ui/ring";
 import { SunHorizon } from "@/components/ui/sun-horizon";
 import { EnergyArc } from "@/components/ui/energy-arc";
+import { CaptureSheet } from "@/components/capture/capture-sheet";
 import { Welcome } from "@/components/onboarding/welcome";
 import { Button } from "@/components/ui/button";
 import {
@@ -116,6 +118,7 @@ export function TodayClient({
   initialMomentum: MomentumDay[];
 }) {
   const supabase = createClient();
+  const router = useRouter();
   const today = localToday();
   const [tasks, setTasks] = useState<DayTask[]>(initialTasks);
   const [big3Ids, setBig3Ids] = useState<string[]>(initialBig3Ids);
@@ -135,6 +138,7 @@ export function TodayClient({
   const dragStartRef = useRef<number | null>(null);
   const [ritualDismissed, setRitualDismissed] = useState(false);
   const [optionalText, setOptionalText] = useState("");
+  const [capturing, setCapturing] = useState(false);
   // A tap on a just-added optional task can land before its insert returns.
   // These replay that intent once the real row arrives, so a fast tap on a
   // slow connection is never silently lost.
@@ -1535,6 +1539,25 @@ export function TodayClient({
             <p className="text-center text-xs text-faint">{reflectNotice}</p>
           )}
         </section>
+      )}
+
+      {/* Always a way to get something out of your head, without leaving the day. */}
+      <div className="flex justify-center pt-2">
+        <button
+          onClick={() => setCapturing(true)}
+          className="press inline-flex items-center gap-2 rounded-pill border border-accent-strong bg-accent px-5 py-2.5 text-sm font-medium text-paper shadow-[var(--shadow-soft)] transition-colors hover:bg-accent-strong"
+        >
+          <Plus className="h-4 w-4" aria-hidden />
+          Capture a thought
+        </button>
+      </div>
+
+      {capturing && (
+        <CaptureSheet
+          userId={userId}
+          onClose={() => setCapturing(false)}
+          onCaptured={() => router.refresh()}
+        />
       )}
 
       <p className="mt-auto pt-6 text-center text-xs text-faint dark:text-faint">

@@ -3,6 +3,24 @@ import { z } from "zod";
 export const energyTags = ["deep", "shallow", "admin"] as const;
 export type EnergyTag = (typeof energyTags)[number];
 
+// What a capture actually is. Only "task" reaches the scheduler — ideas and
+// notes are kept out of the planner entirely, so they can never crowd the day
+// or read as overdue. ("Feeling" is deliberately absent: the mood check-in
+// already owns that, and a second feelings channel would split the data.)
+export const taskKinds = ["task", "idea", "note"] as const;
+export type TaskKind = (typeof taskKinds)[number];
+
+export const KIND_LABEL: Record<TaskKind, string> = {
+  task: "Task",
+  idea: "Idea",
+  note: "Note",
+};
+
+/** Only tasks are schedulable — everything else is kept, not planned. */
+export function isSchedulable(kind: TaskKind | null | undefined): boolean {
+  return (kind ?? "task") === "task";
+}
+
 // v2 task model.
 export const recurrenceFreqs = ["daily", "weekdays", "weekly", "monthly"] as const;
 export type RecurrenceFreq = (typeof recurrenceFreqs)[number];
@@ -59,11 +77,12 @@ export type InboxTask = {
   remind_at: string | null;
   earliest_start: string | null;
   latest_end: string | null;
+  kind: TaskKind;
   created_at: string;
 };
 
 export const inboxTaskColumns =
-  "id, title, status, raw_text, estimated_minutes, energy_tag, deadline, planned_date, project_id, parse_suggestions, parsed_at, recurrence, remind_at, earliest_start, latest_end, created_at";
+  "id, title, status, raw_text, estimated_minutes, energy_tag, deadline, planned_date, project_id, parse_suggestions, parsed_at, recurrence, remind_at, earliest_start, latest_end, kind, created_at";
 
 // The day view's slice of a task (Phase 2 — manual day + Daily Big 3).
 export type DayTask = {

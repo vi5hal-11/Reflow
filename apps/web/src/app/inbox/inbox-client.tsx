@@ -1,16 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { Mic, Sun, Clock, X, Pencil, Trash2, Plus } from "lucide-react";
+import { Mic, Sun, Clock, X, Pencil, Trash2, Plus, Maximize2 } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import {
   inboxTaskColumns,
+  isSchedulable,
   projectColumns,
+  KIND_LABEL,
   type InboxTask,
   type Project,
 } from "@/lib/types";
+import { CaptureSheet } from "@/components/capture/capture-sheet";
 import { DEFAULT_PROJECT_COLOR } from "@/lib/projects";
 import { signOut } from "../login/actions";
 import { TaskEditSheet } from "./edit-sheet";
@@ -79,6 +82,7 @@ export function InboxClient({
   const [parsing, setParsing] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<InboxTask | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [capturing, setCapturing] = useState(false);
 
   const projectsById = useMemo(
     () => new Map(projects.map((p) => [p.id, p])),
@@ -192,6 +196,7 @@ export function InboxClient({
         remind_at: null,
         earliest_start: null,
         latest_end: null,
+        kind: "task",
         created_at: new Date().toISOString(),
       };
       setTasks((prev) => [optimistic, ...prev]);
@@ -223,6 +228,8 @@ export function InboxClient({
 
   const triage = useCallback(
     async (task: InboxTask, fate: "today" | "later" | "drop") => {
+      // Ideas and notes are kept, not planned — they can only be dropped.
+      if (fate === "today" && !isSchedulable(task.kind)) return;
       setTasks((prev) => prev.filter((t) => t.id !== task.id));
       setSelected((s) => Math.max(0, Math.min(s, tasks.length - 2)));
       if (task.id.startsWith("temp-")) return;
@@ -447,9 +454,21 @@ export function InboxClient({
           }
           className={cn(
             "w-full rounded-lg border border-line-strong bg-transparent px-4 py-3 text-base outline-none placeholder:text-faint focus:border-line-strong dark:border-line-strong",
-            voiceSupported && "pr-11",
+            voiceSupported ? "pr-20" : "pr-11",
           )}
         />
+        <button
+          type="button"
+          onClick={() => setCapturing(true)}
+          aria-label="Open the full capture sheet"
+          title="More options"
+          className={cn(
+            "absolute top-1/2 -translate-y-1/2 rounded-md p-2 text-faint transition-colors hover:text-muted",
+            voiceSupported ? "right-11" : "right-2",
+          )}
+        >
+          <Maximize2 className="h-4 w-4" aria-hidden />
+        </button>
         {voiceSupported && (
           <button
             type="button"
@@ -548,6 +567,7 @@ export function InboxClient({
               onClick={() => setSelected(i)}
               className={cn(
                 "lift group rounded-lg border px-4 py-3 transition-colors",
+                "motion-safe:animate-[settle-in_var(--dur-enter)_var(--ease-out)_both]",
                 picked.has(task.id)
                   ? "border-accent bg-accent-tint/40"
                   : i === selected
@@ -567,11 +587,15 @@ export function InboxClient({
                         },
                       ]
                     : []),
-                  {
-                    label: "Schedule today",
-                    icon: <Sun className="h-3.5 w-3.5" aria-hidden />,
-                    onSelect: () => void triage(task, "today"),
-                  },
+                  ...(isSchedulable(task.kind)
+                    ? [
+                        {
+                          label: "Schedule today",
+                          icon: <Sun className="h-3.5 w-3.5" aria-hidden />,
+                          onSelect: () => void triage(task, "today"),
+                        },
+                      ]
+                    : []),
                   {
                     label: "Later",
                     icon: <Clock className="h-3.5 w-3.5" aria-hidden />,
@@ -616,6 +640,18 @@ export function InboxClient({
                   {parsing.has(task.id) && (
                     <span className="text-xs text-faint">thinking…</span>
                   )}
+                  {!isSchedulable(task.kind) && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-xs text-muted">
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 rounded-full",
+                          task.kind === "idea" ? "bg-energy-admin" : "bg-energy-shallow",
+                        )}
+                        aria-hidden
+                      />
+                      {KIND_LABEL[task.kind]}
+                    </span>
+                  )}
                   {task.estimated_minutes !== null && chip(`${task.estimated_minutes}m`)}
                   {task.energy_tag && <EnergyChip tag={task.energy_tag} />}
                   {task.recurrence && chip(`↻ ${task.recurrence}`)}
@@ -653,13 +689,15 @@ export function InboxClient({
                 </div>
               </div>
               <div className="flex shrink-0 gap-1 text-xs">
-                <button
-                  onClick={() => void triage(task, "today")}
-                  className="inline-flex items-center gap-1 rounded-md bg-accent px-2.5 py-1.5 font-medium text-paper transition-colors hover:bg-accent-strong"
-                >
-                  <Sun className="h-3.5 w-3.5" aria-hidden />
-                  Today
-                </button>
+                {isSchedulable(task.kind) && (
+                  <button
+                    onClick={() => void triage(task, "today")}
+                    className="inline-flex items-center gap-1 rounded-md bg-accent px-2.5 py-1.5 font-medium text-paper transition-colors hover:bg-accent-strong"
+                  >
+                    <Sun className="h-3.5 w-3.5" aria-hidden />
+                    Today
+                  </button>
+                )}
                 <button
                   onClick={() => void triage(task, "later")}
                   className="inline-flex items-center gap-1 rounded-md border border-line-strong px-2.5 py-1.5 transition-colors hover:border-accent"
@@ -729,6 +767,17 @@ export function InboxClient({
             </button>
           </div>
         </div>
+      )}
+
+      {capturing && (
+        <CaptureSheet
+          userId={userId}
+          onClose={() => setCapturing(false)}
+          onCaptured={(t) => {
+            setTasks((prev) => [t, ...prev]);
+            if (t.planned_date) setTodayCount((n) => n + 1);
+          }}
+        />
       )}
 
       {editing && (

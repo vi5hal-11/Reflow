@@ -62,6 +62,30 @@ Open http://localhost:3000 and sign in (magic link to your email).
 - [ ] **Reflection** — in the evening (or temporarily set working-hours end near
       now), the "close the day" reflection appears.
 
+## Capture types & the capture sheet
+- [ ] On /inbox tap the expand icon in the capture box (or "Capture a thought"
+      on /today) → the sheet opens.
+- [ ] Type something, pick **Task**, toggle **Add to Big 3 for today** → note
+      "Plan it for today" turns on with it → Save & settle → it lands on Today
+      *and* appears in the Big 3.
+- [ ] Capture something as an **Idea** → the placement options disappear → it
+      sits in the inbox with an "Idea" tag and offers no way to schedule it.
+
+## The daily arc, agenda and review
+- [ ] /today shows **Energy flow** — a curve with a now-dot and "% through",
+      plus your peak window. Paint different hours in Settings and watch it change.
+- [ ] More → **Agenda**: the day by the clock, done vs pending, with a "now" rule.
+- [ ] More → **Review**: how today went → carry unfinished work to tomorrow
+      (one, or all) → star tomorrow's Big 3. On a Sunday, a weekly look back appears.
+
+## Scheduler constraints
+- [ ] Settings → **Protected time**: add "Lunch 12:30–13:15" on weekdays →
+      Plan my day never places anything there.
+- [ ] A task's edit sheet → **Only schedule between** 14:00 and 18:00 → plan →
+      it lands in that window or waits, never outside it.
+- [ ] Settings → **Daily limits** → set a small max → the extra work overflows
+      gently to the tray, and your Big 3 still get placed.
+
 ## Optional day tasks (bonus work)
 - [ ] On /today, add something in **Optional today** → it appears instantly.
       Check it off, then delete it with the ✕.

@@ -2,6 +2,22 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-28 — Test-user feedback, round 3: capture types and the capture sheet
+
+Mockups were used as a source of *concepts*, not a skin — layout and structure were adapted onto the locked "Warm Paper, One Flow" tokens so light/dark and the calm identity survive intact.
+
+- **Capture kinds** (migration `0008`, applied): `tasks.kind` ∈ `task | idea | note`. Only a **task** reaches the scheduler — `/api/plan` filters on it, the inbox hides "Schedule today" for the others, and `triage(…, "today")` guards at the shared entry point. Ideas and notes are *kept, not planned*, so they can never crowd the day or age into something that looks overdue.
+  - **"Feeling" from the mockup was deliberately dropped.** The weather-scale mood check-in already owns that; a second feelings channel would split the same data across two surfaces. "Later" was dropped too — it duplicates the existing Later triage.
+- **The capture sheet** (`components/capture/capture-sheet.tsx`): textarea, type chips, "Plan it for today" and "Add to Big 3 for today", voice, and ⌘/Ctrl+Enter to save. The one-line omnibox **stays the fast path** — this is the considered capture, reached by an expand control on the inbox and by "Capture a thought" on Today (which previously had no capture affordance at all beyond ⌘K).
+  - Starring implies planning it on the day, since a Big 3 only means anything on a day.
+  - **Caught by its own E2E:** the Big 3 is persisted in *two* places by design (`tasks.is_big3` for scheduler ranking, `daily_plans.big3_task_ids` for the day's ordered record) and the sheet initially wrote only the first, so the star never appeared on Today. Both are now written, and a fourth star keeps the task on the day rather than silently bumping an earlier choice.
+- **Motion:** a `settle-in` keyframe (a short downward drift, never a bounce — things land, they don't spring) on captured rows, under `motion-safe:`. The existing reduced-motion floor already covers it. External component libraries were evaluated and **not** used: ReactBits' catalogue is animation-forward (blur text, particles, star borders) and would fight both the calm identity and the sub-100ms interaction budget, which is the project's own tie-breaker.
+- Verified: **69 pytest**, tsc + lint + build green, **36/36 Playwright** on desktop and mobile (4 new).
+
+## 2026-07-28 — Test-user feedback, round 2: daily arc, timed agenda, review flow
+
+See the commit for detail: the profile-driven energy arc on Today, a read-only timed `/agenda`, and the `/review` evening flow (how today went → carry-over → tomorrow's Big 3, with a weekly look back on Sundays).
+
 ## 2026-07-28 — Test-user feedback, round 1: goal shaping, timer chime, undo/reschedule, real constraints
 
 First of three rounds answering test-user feedback (rounds 2–3: energy chart, timed agenda, review flow, UI overhaul).
