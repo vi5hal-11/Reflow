@@ -20,6 +20,16 @@ const FOCUS = [
   { key: "connection", label: "Connection" },
 ];
 
+// How hard the plan should push. Without this the suggestion always came back
+// gentle — someone asking for a real training block got "walk after lunch".
+const INTENSITY = [
+  { key: "gentle", label: "Gentle", hint: "small enough for a bad day" },
+  { key: "steady", label: "Steady", hint: "a real, sustainable routine" },
+  { key: "ambitious", label: "Ambitious", hint: "push me, I mean it" },
+] as const;
+
+type Intensity = (typeof INTENSITY)[number]["key"];
+
 type SuggestedHabit = {
   title: string;
   kind: HabitKind;
@@ -46,6 +56,7 @@ export function GoalOnboard({
   const toast = useToast();
   const [step, setStep] = useState<"form" | "loading" | "review" | "saving">("form");
   const [focus, setFocus] = useState<Set<string>>(new Set(["focus"]));
+  const [intensity, setIntensity] = useState<Intensity>("steady");
   const [aspiration, setAspiration] = useState("");
   const [constraints, setConstraints] = useState("");
   const [goals, setGoals] = useState<SuggestedGoal[]>([]);
@@ -69,6 +80,7 @@ export function GoalOnboard({
           focus_areas: [...focus],
           aspiration: aspiration.trim() || null,
           constraints: constraints.trim() || null,
+          intensity,
           existing_habits: existingTitles,
         }),
       });
@@ -81,7 +93,7 @@ export function GoalOnboard({
       toast("Couldn't reach suggestions — add one manually for now.");
       onClose();
     }
-  }, [focus, aspiration, constraints, existingTitles, toast, onClose]);
+  }, [focus, intensity, aspiration, constraints, existingTitles, toast, onClose]);
 
   const commit = useCallback(async () => {
     setStep("saving");
@@ -148,14 +160,41 @@ export function GoalOnboard({
             </div>
           </div>
 
+          <div className="space-y-1.5">
+            <span className="text-sm text-muted">How hard should this push?</span>
+            <div className="grid grid-cols-3 gap-2">
+              {INTENSITY.map((i) => (
+                <button
+                  key={i.key}
+                  onClick={() => setIntensity(i.key)}
+                  aria-pressed={intensity === i.key}
+                  className={cn(
+                    "flex flex-col items-center gap-0.5 rounded-md border px-2 py-2.5 text-center transition-colors",
+                    intensity === i.key
+                      ? "border-accent bg-accent-tint text-ink"
+                      : "border-line text-muted hover:border-accent",
+                  )}
+                >
+                  <span className="text-sm">{i.label}</span>
+                  <span className="text-[10px] leading-tight text-faint">{i.hint}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <label className="space-y-1.5">
-            <span className="text-sm text-muted">In your words (optional)</span>
+            <span className="text-sm text-muted">
+              In your words — say exactly what you want
+            </span>
             <input
               value={aspiration}
               onChange={(e) => setAspiration(e.target.value)}
-              placeholder="e.g. more energy in the mornings"
+              placeholder="e.g. a 5-day lifting split, or train for a half marathon"
               className="w-full rounded-sm border border-line-strong bg-transparent px-3 py-2.5 text-sm text-ink outline-none placeholder:text-faint focus:border-accent"
             />
+            <span className="block text-[11px] text-faint">
+              This leads — the plan is built around what you write here.
+            </span>
           </label>
 
           <label className="space-y-1.5">
@@ -183,7 +222,7 @@ export function GoalOnboard({
         <div className="flex flex-col items-center gap-3 py-10 text-center">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-line border-t-accent" />
           <p className="text-sm text-muted">
-            {step === "loading" ? "Shaping a gentle plan…" : "Adding them…"}
+            {step === "loading" ? "Shaping your plan…" : "Adding them…"}
           </p>
         </div>
       )}

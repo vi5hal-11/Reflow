@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pause, Play, X } from "lucide-react";
+import { Pause, Play, Volume2, VolumeX, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { buzz, playChime, primeAudio, setSoundEnabled, soundEnabled } from "@/lib/chime";
 
 // A calm full-screen meditation timer. Pick a length, breathe, and on
 // completion it hands the minutes back to be logged. No countdown urgency —
@@ -25,7 +26,15 @@ export function MeditationTimer({
   const [remaining, setRemaining] = useState(initial * 60);
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [sound, setSound] = useState(true);
   const remainingRef = useRef(initial * 60);
+
+  // Read the stored preference after mount (localStorage isn't available during
+  // render, and reading it there would break SSR/hydration parity).
+  useEffect(() => {
+    const t = setTimeout(() => setSound(soundEnabled()), 0);
+    return () => clearTimeout(t);
+  }, []);
 
   // Tick once per second while running. All state changes happen inside the
   // interval callback (an external-system callback), never synchronously in the
@@ -39,6 +48,10 @@ export function MeditationTimer({
         clearInterval(id);
         setRunning(false);
         setFinished(true);
+        // Signal the end for someone sitting with their eyes closed. Both are
+        // best-effort and can never throw into the timer.
+        playChime();
+        buzz();
         onDone(minutes);
       }
     }, 1000);
@@ -51,7 +64,21 @@ export function MeditationTimer({
     setRemaining(p * 60);
   }, []);
 
-  const toggle = useCallback(() => setRunning((r) => !r), []);
+  const toggle = useCallback(() => {
+    // Unlock audio here: iOS only allows it inside a user gesture, so priming
+    // at completion would be silently blocked.
+    primeAudio();
+    setRunning((r) => !r);
+  }, []);
+
+  const toggleSound = useCallback(() => {
+    setSound((on) => {
+      const next = !on;
+      setSoundEnabled(next);
+      if (next) primeAudio();
+      return next;
+    });
+  }, []);
 
   const total = minutes * 60;
   const progress = total > 0 ? 1 - remaining / total : 0;
@@ -68,13 +95,28 @@ export function MeditationTimer({
       aria-modal="true"
       aria-label={`Meditation timer — ${title}`}
     >
-      <button
-        onClick={onClose}
-        aria-label="Close"
-        className="press absolute right-5 top-5 rounded-full border border-line p-2 text-muted hover:border-accent"
-      >
-        <X className="h-4 w-4" aria-hidden />
-      </button>
+      <div className="absolute right-5 top-5 flex items-center gap-2">
+        <button
+          onClick={toggleSound}
+          aria-label={sound ? "Silence the end chime" : "Play a chime when time is up"}
+          aria-pressed={sound}
+          title={sound ? "Chime on" : "Chime off"}
+          className="press rounded-full border border-line p-2 text-muted hover:border-accent"
+        >
+          {sound ? (
+            <Volume2 className="h-4 w-4" aria-hidden />
+          ) : (
+            <VolumeX className="h-4 w-4" aria-hidden />
+          )}
+        </button>
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="press rounded-full border border-line p-2 text-muted hover:border-accent"
+        >
+          <X className="h-4 w-4" aria-hidden />
+        </button>
+      </div>
 
       <span className="text-sm text-faint">{title}</span>
 

@@ -1,6 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { DayProfile } from "@/lib/types";
+import {
+  blockedWindowColumns,
+  dayProfileColumns,
+  type BlockedWindow,
+  type DayProfile,
+} from "@/lib/types";
 import { SettingsClient } from "./settings-client";
 
 export const metadata = { title: "Settings — Reflow" };
@@ -12,13 +17,17 @@ export default async function SettingsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select(
-      "display_name, timezone, working_hours_start, working_hours_end, default_buffer_minutes, energy_profile",
-    )
-    .eq("id", user.id)
-    .single();
+  const [{ data: profile }, { data: blocked }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(`display_name, ${dayProfileColumns}`)
+      .eq("id", user.id)
+      .single(),
+    supabase
+      .from("blocked_windows")
+      .select(blockedWindowColumns)
+      .order("start_time", { ascending: true }),
+  ]);
 
   const fallback: DayProfile & { display_name: string | null } = {
     display_name: null,
@@ -27,6 +36,8 @@ export default async function SettingsPage() {
     working_hours_end: "18:00:00",
     default_buffer_minutes: 10,
     energy_profile: null,
+    max_deep_minutes: null,
+    max_scheduled_minutes: null,
   };
 
   return (
@@ -36,6 +47,7 @@ export default async function SettingsPage() {
         (profile as (DayProfile & { display_name: string | null }) | null) ??
         fallback
       }
+      initialBlocked={(blocked ?? []) as BlockedWindow[]}
     />
   );
 }

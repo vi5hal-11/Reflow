@@ -363,3 +363,129 @@ def test_perf_50_tasks_under_target():
     plan(req)
     elapsed_ms = (time.perf_counter() - t0) * 1000
     assert elapsed_ms < 200, f"re-flow took {elapsed_ms:.1f}ms"
+
+
+# --- per-task timing rules (hard limits, unlike energy preferences) ----------
+
+
+def test_earliest_start_is_respected():
+    req = request(flexible_tasks=[task("late_riser", 60, earliest_start=at(14))])
+    res = plan(req)
+    assert res.placed[0].start >= at(14)
+    assert_invariants(req, res)
+
+
+def test_latest_end_is_respected():
+    req = request(flexible_tasks=[task("before_pickup", 60, latest_end=at(12))])
+    res = plan(req)
+    assert res.placed[0].end <= at(12)
+    assert_invariants(req, res)
+
+
+def test_task_overflows_when_its_window_is_too_narrow():
+    """A 90m task allowed only inside a 60m window can't be placed anywhere."""
+    req = request(
+        flexible_tasks=[task("squeeze", 90, earliest_start=at(10), latest_end=at(11))]
+    )
+    res = plan(req)
+    assert res.placed == []
+    assert res.overflow == ["squeeze"]
+
+
+def test_timing_rule_beats_energy_preference():
+    """Energy windows are a preference; earliest_start is a hard limit."""
+    req = request(
+        flexible_tasks=[task("deep", 60, energy_tag="deep", earliest_start=at(15))],
+        energy_windows=[EnergyWindow(tag="deep", start=at(9), end=at(12))],
+    )
+    res = plan(req)
+    assert res.placed[0].start >= at(15)
+
+
+def test_kept_placement_released_when_it_breaks_a_new_rule():
+    """Adding 'not before 2pm' to an already-placed task must move it."""
+    req = request(
+        now=at(9),
+        flexible_tasks=[
+            task(
+                "moved",
+                60,
+                scheduled_start=at(10),
+                scheduled_end=at(11),
+                earliest_start=at(14),
+            )
+        ],
+    )
+    res = plan(req)
+    assert not res.placed[0].kept
+    assert res.placed[0].start >= at(14)
+
+
+# --- daily caps --------------------------------------------------------------
+
+
+def test_max_scheduled_minutes_caps_the_day():
+    req = request(
+        flexible_tasks=[task(f"t{i}", 60) for i in range(5)],
+        max_scheduled_minutes=120,
+        wildcard_count=0,
+    )
+    res = plan(req)
+    assert len(res.placed) == 2, "cap should stop the third hour"
+    assert len(res.overflow) == 3
+    assert_invariants(req, res)
+
+
+def test_max_deep_minutes_only_counts_deep_work():
+    req = request(
+        flexible_tasks=[
+            task("deep1", 60, energy_tag="deep"),
+            task("deep2", 60, energy_tag="deep"),
+            task("admin1", 60, energy_tag="admin"),
+        ],
+        max_deep_minutes=60,
+        wildcard_count=0,
+    )
+    res = plan(req)
+    placed = {p.task_id for p in res.placed}
+    assert "deep1" in placed
+    assert "deep2" in res.overflow, "second deep block exceeds the deep cap"
+    assert "admin1" in placed, "admin work is unaffected by the deep cap"
+
+
+def test_big3_are_exempt_from_caps():
+    """§5 guarantees the Big 3 place; a cap protects the rest of the day."""
+    req = request(
+        flexible_tasks=[
+            task("big1", 60, is_big3=True),
+            task("big2", 60, is_big3=True),
+            task("filler", 60),
+        ],
+        max_scheduled_minutes=60,
+        wildcard_count=0,
+    )
+    res = plan(req)
+    placed = {p.task_id for p in res.placed}
+    assert {"big1", "big2"} <= placed
+    assert res.overflow == ["filler"]
+
+
+def test_kept_blocks_spend_the_cap_budget():
+    """A re-flow must not exceed a cap by treating committed work as free."""
+    req = request(
+        now=at(9),
+        flexible_tasks=[
+            task("already", 60, scheduled_start=at(10), scheduled_end=at(11)),
+            task("extra", 60),
+        ],
+        max_scheduled_minutes=60,
+        wildcard_count=0,
+    )
+    res = plan(req)
+    assert res.overflow == ["extra"]
+
+
+def test_no_caps_by_default():
+    req = request(flexible_tasks=[task(f"t{i}", 60) for i in range(4)], wildcard_count=0)
+    res = plan(req)
+    assert res.overflow == []

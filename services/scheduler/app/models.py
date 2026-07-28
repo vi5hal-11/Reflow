@@ -30,6 +30,14 @@ class FlexibleTask(BaseModel):
     created_at: datetime | None = None
     """FIFO tiebreak after big3/deadline/priority ranking."""
 
+    # Per-task timing rules. Resolved by the caller against the plan's local day
+    # (same contract as EnergyWindow), so the engine stays timezone-agnostic.
+    # Unlike energy windows these are HARD: a task is never placed outside them.
+    earliest_start: datetime | None = None
+    """Never start before this ("not before 10am")."""
+    latest_end: datetime | None = None
+    """Must be finished by this ("done before school pickup")."""
+
 
 class EnergyWindow(BaseModel):
     """A concrete time range where a given energy tag is preferred.
@@ -53,6 +61,13 @@ class ScheduleRequest(BaseModel):
     default_buffer_minutes: int = Field(default=10, ge=0, le=120)
     wildcard_count: int = Field(default=1, ge=0, le=2)
     wildcard_minutes: int = Field(default=30, gt=0)
+
+    # Daily ceilings so a day can't be stuffed. None = no cap.
+    # Big 3 are deliberately exempt: §5 makes them the day's definition of a win
+    # and guarantees they are placed before anything else. A cap protects the
+    # *rest* of the day from over-commitment, it doesn't veto your three.
+    max_deep_minutes: int | None = Field(default=None, ge=0)
+    max_scheduled_minutes: int | None = Field(default=None, ge=0)
 
 
 class PlacedBlock(BaseModel):

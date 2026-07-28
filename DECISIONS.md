@@ -2,6 +2,21 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-28 — Test-user feedback, round 1: goal shaping, timer chime, undo/reschedule, real constraints
+
+First of three rounds answering test-user feedback (rounds 2–3: energy chart, timed agenda, review flow, UI overhaul).
+
+- **Goal shaping honours what the user asked for.** Root cause of "I asked for a workout session and got *walk after lunch*": the prompt hard-coded a bias toward tiny habits ("prefer keystone habits the user could keep on a bad day") and the deterministic fallback was keyed only by focus area — so *every* health ask returned the same gentle stroll. Now a **`intensity`** (gentle / steady / ambitious) travels through the proxy to the edge, the prompt is rewritten to follow the user's instruction and *stay on their subject*, and `_STARTERS` is keyed by **(focus, intensity)** so even an offline fallback can't flatten an ambitious ask. The user's free-text aspiration now titles the plan instead of our generic phrasing. Locked by tests asserting "Walk after lunch" is absent from an ambitious result.
+- **Meditation timer signals the end.** New `lib/chime.ts` synthesizes a two-tone bell via Web Audio — no asset to ship, works offline, soft attack so it can't startle someone with their eyes closed — plus `navigator.vibrate` and a mute toggle persisted in localStorage. Audio is primed on the *start press* because iOS only unlocks audio inside a user gesture; priming at completion would be silently blocked.
+- **Mistaken completions are fixable.** Two real bugs: `beginDrag` refused any task with `status === "done"`, so a finished task could never be rescheduled; and the done/undo/unplace controls were `opacity-0 group-hover:opacity-100`, i.e. **completely unreachable on touch** — the likely reason this felt impossible on a phone. Done blocks are now draggable, and the controls are always visible below `sm` and hover/focus-revealed above it. Focus mode's one-way ✓ Done gained an undo bar, rendered in *both* branches so finishing the last task (which flips Focus to its empty state) doesn't strand you.
+- **The scheduler takes real constraints** (migration `0007`, applied live). Three kinds, all optional, all off by default:
+  - **Blocked windows** (`blocked_windows` table, recurring by weekday). The BFF resolves them against the local day and hands them to the engine as ordinary fixed blocks — **the engine needs no concept of recurrence**.
+  - **Per-task timing rules** (`tasks.earliest_start` / `latest_end`). Hard limits, unlike energy tags which stay a preference; `_best_fit` clips each free interval to the task's bounds, and a kept placement that violates a newly-added rule is released so the re-flow can move it.
+  - **Daily caps** (`profiles.max_deep_minutes` / `max_scheduled_minutes`). Kept blocks spend the budget too, so a re-flow can't exceed a cap by treating committed work as free. **Big 3 are exempt** — §5 guarantees they place first and the win banner depends on it; a cap protects the *rest* of the day.
+  - The client sends `utcOffsetMinutes` so the BFF can resolve stored clock times without duplicating day math (consistent with the existing "client owns local-day math" contract).
+- **Fixed a pre-existing test-hermeticity bug** surfaced by the new tests: `app.main` calls `load_dotenv()` at import, so on a machine with a real `GEMINI_API_KEY` in `.env` the LLM-edge tests hit the live API and asserted against model output. CI stayed green only because CI has no key. `tests/conftest.py` now strips the key; the suite went from 53s (real network calls) to 1.6s.
+- Verified: **30 scheduler tests** (11 new constraint tests) + **59 total pytest**, tsc + lint + build green, **24/24 Playwright** on desktop and mobile.
+
 ## 2026-07-24 — Calendar removed; optional day tasks; habit editing; More nav
 
 Founder direction: drop Google Calendar, surface the features that were buried, and add optional per-day tasks.

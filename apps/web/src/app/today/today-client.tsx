@@ -221,6 +221,9 @@ export function TodayClient({
             workingWindowStart: minutesToIso(dayStart),
             workingWindowEnd: minutesToIso(dayEnd),
             energyWindows,
+            // Lets the BFF resolve stored clock times (blocked windows,
+            // per-task rules) against this browser's local day.
+            utcOffsetMinutes: new Date().getTimezoneOffset(),
           }),
         });
         if (!res.ok) {
@@ -492,6 +495,8 @@ export function TodayClient({
       scheduled_start: null,
       scheduled_end: null,
       recurrence: null,
+      earliest_start: null,
+      latest_end: null,
     };
     setTasks((prev) => [...prev, optimistic]);
 
@@ -838,9 +843,11 @@ export function TodayClient({
   // Drag-to-reschedule: grab a placed block, drop it at a new time (snapped to
   // 5 min). A manual override — no re-flow after, and a no-move tap is a no-op.
   // Fallback for touch/keyboard is the existing place/unplace flow (WCAG 2.5.7).
+  // Done blocks are draggable too: a finished task often didn't happen when it
+  // was planned to, and correcting that shouldn't require un-completing it.
   const beginDrag = useCallback(
     (e: React.PointerEvent, t: DayTask) => {
-      if (t.status === "done" || !t.scheduled_start) return;
+      if (!t.scheduled_start) return;
       const rect = timelineRef.current?.getBoundingClientRect();
       if (!rect) return;
       const s = toMinutes(t.scheduled_start);
@@ -1215,11 +1222,11 @@ export function TodayClient({
                   key={t.id}
                   onPointerDown={(e) => beginDrag(e, t)}
                   className={cn(
-                    "timeline-block group absolute left-14 right-0 touch-none overflow-hidden rounded-md border border-l-[3px] px-3 py-1 select-none",
+                    "timeline-block group absolute left-14 right-0 cursor-grab touch-none overflow-hidden rounded-md border border-l-[3px] px-3 py-1 select-none",
                     done
                       ? "border-line border-l-line bg-surface"
                       : cn(
-                          "cursor-grab border-line bg-surface shadow-sm",
+                          "border-line bg-surface shadow-sm",
                           t.energy_tag ? ENERGY[t.energy_tag].borderL : "border-l-accent",
                         ),
                     isDragging && "z-20 cursor-grabbing shadow-[var(--shadow-soft)]",
@@ -1242,10 +1249,17 @@ export function TodayClient({
                     </p>
                     <div
                       onPointerDown={(e) => e.stopPropagation()}
-                      className="flex shrink-0 gap-1 text-[11px] opacity-0 group-hover:opacity-100"
+                      // Always visible on touch (there is no hover on a phone —
+                      // these controls used to be unreachable there); revealed
+                      // on hover/focus on desktop to keep the timeline quiet.
+                      className="flex shrink-0 gap-1 text-[11px] transition-opacity focus-within:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                     >
                       <button
                         onClick={() => void toggleDone(t)}
+                        aria-label={
+                          done ? `Mark ${t.title} not done` : `Mark ${t.title} done`
+                        }
+                        title={done ? "Marked done by mistake? Put it back." : "Mark done"}
                         className="rounded border border-line-strong px-1.5 hover:border-accent"
                       >
                         {done ? "undo" : "done"}
@@ -1253,6 +1267,7 @@ export function TodayClient({
                       {!done && (
                         <button
                           onClick={() => void unschedule(t)}
+                          aria-label={`Unplace ${t.title}`}
                           title="Back to the tray — no harm done"
                           className="rounded border border-line-strong px-1.5 text-faint hover:border-line-strong dark:border-line-strong"
                         >

@@ -46,23 +46,42 @@ def _conflicts(candidate: Interval, busy: list[Interval], buffer: timedelta) -> 
     return any(start < b_end + buffer and end > b_start - buffer for b_start, b_end in busy)
 
 
+def _bounds(task: FlexibleTask, window: Interval) -> Interval:
+    """The window narrowed by this task's own timing rules (hard limits)."""
+    lo, hi = window
+    if task.earliest_start is not None and task.earliest_start > lo:
+        lo = task.earliest_start
+    if task.latest_end is not None and task.latest_end < hi:
+        hi = task.latest_end
+    return (lo, hi)
+
+
 def _best_fit(
     task: FlexibleTask,
     free: list[Interval],
     energy_windows: list[Interval],
+    bounds: Interval,
 ) -> Interval | None:
-    """Earliest energy-matched start if any, else earliest start that fits."""
+    """Earliest energy-matched start if any, else earliest start that fits.
+
+    Energy windows are a *preference*; `bounds` is a hard limit — a task is
+    never placed outside its own earliest_start/latest_end.
+    """
     duration = timedelta(minutes=task.estimated_minutes)
+    b_lo, b_hi = bounds
     fallback: Interval | None = None
     best_energy: Interval | None = None
     for f_start, f_end in free:
-        if f_end - f_start < duration:
+        # Clip each free interval to the task's allowed range before fitting.
+        s = max(f_start, b_lo)
+        e = min(f_end, b_hi)
+        if e - s < duration:
             continue
         if fallback is None:
-            fallback = (f_start, f_start + duration)
+            fallback = (s, s + duration)
         for e_start, e_end in energy_windows:
-            start = max(f_start, e_start)
-            if start + duration <= f_end and start < e_end:
+            start = max(s, e_start)
+            if start + duration <= e and start < e_end:
                 candidate = (start, start + duration)
                 if best_energy is None or candidate[0] < best_energy[0]:
                     best_energy = candidate
@@ -95,6 +114,11 @@ def plan(req: ScheduleRequest) -> ScheduleResponse:
         )
         if not valid_span or (start < window_start and not in_progress):
             continue
+        # A placement that breaks the task's own timing rules is no longer valid
+        # — release it so this re-flow can move it somewhere legal.
+        b_lo, b_hi = _bounds(task, (req.working_window_start, window_end))
+        if start < b_lo or end > b_hi:
+            continue
         occupied = (max(start, window_start), end)
         if _conflicts(occupied, busy, buffer):
             continue
@@ -117,13 +141,52 @@ def plan(req: ScheduleRequest) -> ScheduleResponse:
     placed: list[PlacedBlock] = []
     overflow: list[str] = []
 
+    # --- daily caps ----------------------------------------------------------
+    # Blocks already committed (kept) spend the day's budget too, so a re-flow
+    # can't quietly exceed a cap by treating existing work as free.
+    by_id = {t.id: t for t in req.flexible_tasks}
+    used_total = 0
+    used_deep = 0
+    for p in kept:
+        task = by_id.get(p.task_id)
+        if task is None:
+            continue
+        used_total += task.estimated_minutes
+        if task.energy_tag == "deep":
+            used_deep += task.estimated_minutes
+
+    def within_caps(task: FlexibleTask) -> bool:
+        # Big 3 are exempt by design (see ScheduleRequest): they are the day's
+        # definition of a win and §5 guarantees they place first.
+        if task.is_big3:
+            return True
+        mins = task.estimated_minutes
+        if (
+            req.max_scheduled_minutes is not None
+            and used_total + mins > req.max_scheduled_minutes
+        ):
+            return False
+        if (
+            req.max_deep_minutes is not None
+            and task.energy_tag == "deep"
+            and used_deep + mins > req.max_deep_minutes
+        ):
+            return False
+        return True
+
     def try_place(task: FlexibleTask) -> bool:
+        nonlocal used_total, used_deep
+        if not within_caps(task):
+            return False
         free = free_intervals(window, busy, req.default_buffer_minutes)
-        slot = _best_fit(task, free, energy_for(task))
+        slot = _best_fit(task, free, energy_for(task), _bounds(task, window))
         if slot is None:
             return False
         placed.append(PlacedBlock(task_id=task.id, start=slot[0], end=slot[1], kept=False))
         busy.append(slot)
+        used_total += task.estimated_minutes
+        if task.energy_tag == "deep":
+            used_deep += task.estimated_minutes
         return True
 
     # --- 4a. Big 3 outrank everything, including wildcards ------------------

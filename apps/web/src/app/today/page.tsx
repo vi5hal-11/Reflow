@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
+  dayProfileColumns,
   dayTaskColumns,
   type DayProfile,
   type DayTask,
@@ -36,7 +37,7 @@ export default async function TodayPage() {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "timezone, working_hours_start, working_hours_end, default_buffer_minutes, energy_profile",
+      dayProfileColumns,
     )
     .eq("id", user.id)
     .single();
@@ -102,6 +103,8 @@ export default async function TodayPage() {
     working_hours_end: "18:00:00",
     default_buffer_minutes: 10,
     energy_profile: null,
+    max_deep_minutes: null,
+    max_scheduled_minutes: null,
   };
 
   return (

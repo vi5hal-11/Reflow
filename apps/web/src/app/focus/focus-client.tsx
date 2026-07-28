@@ -98,6 +98,33 @@ export function FocusClient({
     return i >= 0 ? pending[i + 1] ?? null : null;
   }, [pending, current]);
 
+  // The last thing completed here, so a mis-tap is one press from being undone.
+  // Focus advances immediately on completion, which used to make an accidental
+  // ✓ Done unrecoverable without leaving for the timeline.
+  const [lastDone, setLastDone] = useState<DayTask | null>(null);
+
+  const uncomplete = useCallback(
+    async (task: DayTask) => {
+      setLastDone(null);
+      setTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? { ...t, status: "scheduled" } : t)),
+      );
+      const { error } = await supabase
+        .from("tasks")
+        .update({ status: "scheduled" })
+        .eq("id", task.id);
+      if (error) {
+        setTasks((prev) =>
+          prev.map((t) => (t.id === task.id ? { ...t, status: "done" } : t)),
+        );
+        toast("Couldn't undo — try again.");
+      }
+      // Momentum stays marked: you did show up today, whatever this task's
+      // status ends up being (§7).
+    },
+    [supabase, toast],
+  );
+
   const complete = useCallback(
     async (task: DayTask) => {
       setTasks((prev) =>
@@ -119,8 +146,11 @@ export function FocusClient({
           prev.map((t) => (t.id === task.id ? { ...t, status: task.status } : t)),
         );
         toast("Couldn't save — try again.");
-      } else if (task.recurrence) {
-        void supabase.from("tasks").insert(nextRecurringInsert(task, userId));
+      } else {
+        setLastDone(task);
+        if (task.recurrence) {
+          void supabase.from("tasks").insert(nextRecurringInsert(task, userId));
+        }
       }
     },
     [supabase, userId, toast],
@@ -136,11 +166,28 @@ export function FocusClient({
     </header>
   );
 
+  // Rendered in both branches: finishing the *last* task flips this view to its
+  // empty state, which is precisely when an accidental ✓ needs undoing.
+  const undoBar = lastDone ? (
+    <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5 text-sm">
+      <span className="min-w-0 flex-1 truncate text-muted">
+        Marked <span className="text-ink">{lastDone.title}</span> done.
+      </span>
+      <button
+        onClick={() => void uncomplete(lastDone)}
+        className="shrink-0 font-medium text-accent-text underline underline-offset-4"
+      >
+        Undo
+      </button>
+    </div>
+  ) : null;
+
   if (!current) {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-8 px-6 py-10 pb-28 sm:pb-10">
         {header}
         <CommandBar />
+        {undoBar}
         <EmptyState
           title={
             todays.length > 0
@@ -222,6 +269,8 @@ export function FocusClient({
           </Link>
         </div>
       </section>
+
+      {undoBar}
 
       {next ? (
         <div className="text-sm text-muted">

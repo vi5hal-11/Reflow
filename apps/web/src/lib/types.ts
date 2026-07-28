@@ -57,11 +57,13 @@ export type InboxTask = {
   parsed_at: string | null;
   recurrence: RecurrenceFreq | null;
   remind_at: string | null;
+  earliest_start: string | null;
+  latest_end: string | null;
   created_at: string;
 };
 
 export const inboxTaskColumns =
-  "id, title, status, raw_text, estimated_minutes, energy_tag, deadline, planned_date, project_id, parse_suggestions, parsed_at, recurrence, remind_at, created_at";
+  "id, title, status, raw_text, estimated_minutes, energy_tag, deadline, planned_date, project_id, parse_suggestions, parsed_at, recurrence, remind_at, earliest_start, latest_end, created_at";
 
 // The day view's slice of a task (Phase 2 — manual day + Daily Big 3).
 export type DayTask = {
@@ -82,10 +84,25 @@ export type DayTask = {
   scheduled_start: string | null;
   scheduled_end: string | null;
   recurrence: RecurrenceFreq | null;
+  // Per-task timing rules, "HH:MM:SS" local clock times. Hard limits for the
+  // scheduler — unlike energy tags, which are only a preference.
+  earliest_start: string | null;
+  latest_end: string | null;
 };
 
 export const dayTaskColumns =
-  "id, title, status, estimated_minutes, energy_tag, priority, deadline, planned_date, is_fixed, fixed_start, is_big3, is_optional, scheduled_start, scheduled_end, recurrence";
+  "id, title, status, estimated_minutes, energy_tag, priority, deadline, planned_date, is_fixed, fixed_start, is_big3, is_optional, scheduled_start, scheduled_end, recurrence, earliest_start, latest_end";
+
+// A recurring stretch of the day the scheduler must never place into.
+export type BlockedWindow = {
+  id: string;
+  label: string;
+  start_time: string; // "HH:MM:SS"
+  end_time: string;
+  days_of_week: number[]; // 0 = Sunday .. 6 = Saturday (JS Date#getDay)
+};
+
+export const blockedWindowColumns = "id, label, start_time, end_time, days_of_week";
 
 // jsonb clock-string ranges per energy tag, e.g. {"deep":["09:00-12:00"]}.
 // The client resolves these against its local day before calling /api/plan.
@@ -97,7 +114,14 @@ export type DayProfile = {
   working_hours_end: string;
   default_buffer_minutes: number;
   energy_profile: EnergyProfile | null;
+  // Daily ceilings so the day can't be stuffed. null = no cap. The Big 3 are
+  // exempt by design — a cap protects the rest of the day.
+  max_deep_minutes: number | null;
+  max_scheduled_minutes: number | null;
 };
+
+export const dayProfileColumns =
+  "timezone, working_hours_start, working_hours_end, default_buffer_minutes, energy_profile, max_deep_minutes, max_scheduled_minutes";
 
 // What /api/plan returns on success (Phase 3 — auto-schedule + re-flow).
 export type PlanWildcard = { start: string; end: string };

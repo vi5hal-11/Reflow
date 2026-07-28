@@ -190,6 +190,8 @@ export function InboxClient({
         parsed_at: null,
         recurrence: null,
         remind_at: null,
+        earliest_start: null,
+        latest_end: null,
         created_at: new Date().toISOString(),
       };
       setTasks((prev) => [optimistic, ...prev]);

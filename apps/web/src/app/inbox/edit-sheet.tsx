@@ -52,6 +52,9 @@ export function TaskEditSheet({
   const [deadline, setDeadline] = useState(toLocalInput(task.deadline));
   const [recurrence, setRecurrence] = useState<RecurrenceFreq | "">(task.recurrence ?? "");
   const [remindAt, setRemindAt] = useState(toLocalInput(task.remind_at));
+  // Hard scheduling limits ("not before", "done by") as HH:MM clock times.
+  const [earliest, setEarliest] = useState((task.earliest_start ?? "").slice(0, 5));
+  const [latest, setLatest] = useState((task.latest_end ?? "").slice(0, 5));
   const [saving, setSaving] = useState(false);
 
   // Show archived projects only if this task is already in one (so its label
@@ -124,6 +127,8 @@ export function TaskEditSheet({
       deadline: deadline ? new Date(deadline).toISOString() : null,
       recurrence: recurrence || null,
       remind_at: remindAt ? new Date(remindAt).toISOString() : null,
+      earliest_start: earliest || null,
+      latest_end: latest || null,
     };
     const { error } = await supabase.from("tasks").update(patch).eq("id", task.id);
     setSaving(false);
@@ -324,6 +329,42 @@ export function TaskEditSheet({
               className={cn(inputClass, "tabular")}
             />
           </label>
+        </div>
+
+        {/* Hard scheduling limits — unlike energy, the planner never breaks these. */}
+        <div className="space-y-1.5">
+          <span className="text-sm text-muted">Only schedule between</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="time"
+              value={earliest}
+              onChange={(e) => setEarliest(e.target.value)}
+              aria-label="Not before"
+              className={cn(inputClass, "tabular w-32")}
+            />
+            <span className="text-sm text-faint">and</span>
+            <input
+              type="time"
+              value={latest}
+              onChange={(e) => setLatest(e.target.value)}
+              aria-label="Finished by"
+              className={cn(inputClass, "tabular w-32")}
+            />
+            {(earliest || latest) && (
+              <button
+                onClick={() => {
+                  setEarliest("");
+                  setLatest("");
+                }}
+                className="text-xs text-faint underline underline-offset-4 hover:text-ink"
+              >
+                clear
+              </button>
+            )}
+          </div>
+          <span className="block text-[11px] text-faint">
+            Leave blank for anytime in your working hours.
+          </span>
         </div>
 
         <div className="flex justify-end gap-2 pt-1">

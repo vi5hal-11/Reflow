@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import {
+  blockedWindowColumns,
   dayTaskColumns,
   energyTags,
+  type BlockedWindow,
   type DayTask,
   type EnergyTag,
   type PlanResponse,
@@ -29,7 +31,20 @@ const bodySchema = z.object({
       end: isoDatetime,
     }),
   ),
+  // Date#getTimezoneOffset() from the browser. Lets the BFF resolve stored
+  // clock times (blocked windows, per-task rules) against the user's local day
+  // without duplicating day math on the client.
+  utcOffsetMinutes: z.number().int().min(-840).max(840).default(0),
 });
+
+/** A stored "HH:MM[:SS]" local clock time → an instant on the plan's local day. */
+function localTimeToIso(date: string, time: string, offsetMinutes: number): string {
+  const hms = time.length === 5 ? `${time}:00` : time;
+  const asUtc = Date.parse(`${date}T${hms}Z`);
+  if (Number.isNaN(asUtc)) return "";
+  // getTimezoneOffset() is minutes to ADD to local to reach UTC.
+  return new Date(asUtc + offsetMinutes * 60_000).toISOString();
+}
 
 // The deterministic scheduler's response (services/scheduler/app/models.py).
 // Validated defensively — never trust another service blindly.
@@ -68,7 +83,8 @@ export async function POST(request: Request) {
   if (!parsedBody.success) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
-  const { date, workingWindowStart, workingWindowEnd, energyWindows } = parsedBody.data;
+  const { date, workingWindowStart, workingWindowEnd, energyWindows, utcOffsetMinutes } =
+    parsedBody.data;
 
   const supabase = await createClient();
   const {
@@ -83,11 +99,14 @@ export async function POST(request: Request) {
 
   // The day's tasks: today's tray (todo), current placements (scheduled/done
   // in the window), and fixed appointments in the window.
-  const [{ data: profile }, { data: taskRows, error: tasksError }] =
-    await Promise.all([
+  const [
+    { data: profile },
+    { data: taskRows, error: tasksError },
+    { data: blockedRows },
+  ] = await Promise.all([
       supabase
         .from("profiles")
-        .select("default_buffer_minutes")
+        .select("default_buffer_minutes, max_deep_minutes, max_scheduled_minutes")
         .eq("id", user.id)
         .single(),
       supabase
@@ -105,21 +124,38 @@ export async function POST(request: Request) {
           ].join(","),
         )
         .order("created_at", { ascending: true }),
+      supabase.from("blocked_windows").select(blockedWindowColumns),
     ]);
   if (tasksError) return degraded();
 
   const tasks = (taskRows ?? []) as PlanTask[];
 
+  // Blocked windows recurring on this weekday become ordinary fixed blocks, so
+  // the engine needs no concept of recurrence — it simply can't place there.
+  const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
+  const blockedBlocks = ((blockedRows ?? []) as BlockedWindow[])
+    .filter((w) => w.days_of_week?.includes(weekday))
+    .map((w) => ({
+      id: `blocked-${w.id}`,
+      title: w.label,
+      start: localTimeToIso(date, w.start_time, utcOffsetMinutes),
+      end: localTimeToIso(date, w.end_time, utcOffsetMinutes),
+    }))
+    .filter((b) => b.start && b.end && b.start < b.end);
+
   // Fixed blocks are immovable: undone fixed appointments. Done tasks are
   // finished — not rescheduled, and their old blocks aren't busy.
-  const fixedBlocks = tasks
-    .filter((t) => t.is_fixed && t.fixed_start && t.status !== "done")
-    .map((t) => ({
-      id: t.id,
-      title: t.title,
-      start: t.fixed_start!,
-      end: addMinutes(t.fixed_start!, t.estimated_minutes ?? DEFAULT_FIXED_MINUTES),
-    }));
+  const fixedBlocks = [
+    ...tasks
+      .filter((t) => t.is_fixed && t.fixed_start && t.status !== "done")
+      .map((t) => ({
+        id: t.id,
+        title: t.title,
+        start: t.fixed_start!,
+        end: addMinutes(t.fixed_start!, t.estimated_minutes ?? DEFAULT_FIXED_MINUTES),
+      })),
+    ...blockedBlocks,
+  ];
 
   // Phase 5 estimate learning: people chronically under-estimate. Derive a
   // per-energy-tag correction factor from the user's own history (mean
@@ -167,6 +203,13 @@ export async function POST(request: Request) {
       scheduled_start: t.scheduled_start,
       scheduled_end: t.scheduled_end,
       created_at: t.created_at,
+      // Hard per-task limits, resolved against this local day.
+      earliest_start: t.earliest_start
+        ? localTimeToIso(date, t.earliest_start, utcOffsetMinutes) || null
+        : null,
+      latest_end: t.latest_end
+        ? localTimeToIso(date, t.latest_end, utcOffsetMinutes) || null
+        : null,
     }));
 
   let result: z.infer<typeof scheduleResponseSchema>;
@@ -183,6 +226,9 @@ export async function POST(request: Request) {
         flexible_tasks: flexibleTasks,
         energy_windows: energyWindows,
         default_buffer_minutes: profile?.default_buffer_minutes ?? 10,
+        // null = uncapped, which is the default for everyone.
+        max_deep_minutes: profile?.max_deep_minutes ?? null,
+        max_scheduled_minutes: profile?.max_scheduled_minutes ?? null,
       }),
     });
     if (!res.ok) return degraded();

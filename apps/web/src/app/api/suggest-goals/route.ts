@@ -14,6 +14,9 @@ const bodySchema = z.object({
   focus_areas: z.array(z.string().max(40)).max(8).default([]),
   aspiration: z.string().max(500).nullable().default(null),
   constraints: z.string().max(500).nullable().default(null),
+  // How hard to push. The edge shapes both the prompt and its deterministic
+  // fallback around this, so an ambitious ask never comes back gentle.
+  intensity: z.enum(["gentle", "steady", "ambitious"]).default("steady"),
   existing_habits: z.array(z.string().max(120)).max(50).default([]),
 });
 
@@ -67,6 +70,8 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
+  // Hoisted so the closure below keeps the narrowed type.
+  const body = parsed.data;
 
   const supabase = await createClient();
   const {
@@ -74,8 +79,19 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
+  // Last-ditch set, used only when the scheduler itself is unreachable. It
+  // can't reproduce the edge's full intensity matrix, but it should still sound
+  // like the user's own plan rather than a generic one.
+  function localFallback() {
+    const aspiration = body.aspiration?.trim();
+    if (!aspiration) return LOCAL_FALLBACK;
+    const goals = structuredClone(LOCAL_FALLBACK.goals);
+    goals[0].title = aspiration.slice(0, 120);
+    return { ...LOCAL_FALLBACK, goals };
+  }
+
   const schedulerUrl = process.env.SCHEDULER_URL;
-  if (!schedulerUrl) return NextResponse.json(LOCAL_FALLBACK);
+  if (!schedulerUrl) return NextResponse.json(localFallback());
 
   try {
     const res = await fetch(`${schedulerUrl}/suggest-goals`, {
@@ -84,9 +100,9 @@ export async function POST(request: Request) {
       signal: AbortSignal.timeout(25_000),
       body: JSON.stringify(parsed.data),
     });
-    if (!res.ok) return NextResponse.json(LOCAL_FALLBACK);
+    if (!res.ok) return NextResponse.json(localFallback());
     return NextResponse.json(suggestionSchema.parse(await res.json()));
   } catch {
-    return NextResponse.json(LOCAL_FALLBACK);
+    return NextResponse.json(localFallback());
   }
 }

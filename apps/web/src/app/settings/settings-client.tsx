@@ -7,7 +7,17 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/ui/section-header";
 import { useToast } from "@/components/ui/toast";
-import { energyTags, type DayProfile, type EnergyTag, type EnergyProfile } from "@/lib/types";
+import {
+  blockedWindowColumns,
+  energyTags,
+  type BlockedWindow,
+  type DayProfile,
+  type EnergyTag,
+  type EnergyProfile,
+} from "@/lib/types";
+
+const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
+const WEEKDAYS = [1, 2, 3, 4, 5];
 
 type Brush = EnergyTag | null;
 
@@ -93,9 +103,11 @@ function hourLabel(h: number): string {
 export function SettingsClient({
   userId,
   profile,
+  initialBlocked,
 }: {
   userId: string;
   profile: DayProfile & { display_name: string | null };
+  initialBlocked: BlockedWindow[];
 }) {
   const supabase = createClient();
   const toast = useToast();
@@ -111,6 +123,62 @@ export function SettingsClient({
   const [brush, setBrush] = useState<Brush>("deep");
   const [saving, setSaving] = useState(false);
   const paintingRef = useRef(false);
+
+  // Daily caps — empty string means "no cap", which is the default.
+  const [maxDeep, setMaxDeep] = useState(
+    profile.max_deep_minutes == null ? "" : String(profile.max_deep_minutes),
+  );
+  const [maxScheduled, setMaxScheduled] = useState(
+    profile.max_scheduled_minutes == null ? "" : String(profile.max_scheduled_minutes),
+  );
+
+  // Protected time — recurring windows the scheduler must never place into.
+  const [blocked, setBlocked] = useState<BlockedWindow[]>(initialBlocked);
+  const [bLabel, setBLabel] = useState("");
+  const [bStart, setBStart] = useState("12:30");
+  const [bEnd, setBEnd] = useState("13:15");
+  const [bDays, setBDays] = useState<number[]>(WEEKDAYS);
+
+  const toggleDay = useCallback((d: number) => {
+    setBDays((prev) =>
+      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort(),
+    );
+  }, []);
+
+  const addBlocked = useCallback(async () => {
+    const label = bLabel.trim();
+    if (!label || bDays.length === 0 || bEnd <= bStart) return;
+    const { data, error } = await supabase
+      .from("blocked_windows")
+      .insert({
+        user_id: userId,
+        label,
+        start_time: bStart,
+        end_time: bEnd,
+        days_of_week: bDays,
+      })
+      .select(blockedWindowColumns)
+      .single();
+    if (error || !data) {
+      toast("Couldn't add that — try again.");
+      return;
+    }
+    setBlocked((prev) => [...prev, data as BlockedWindow]);
+    setBLabel("");
+    toast("Protected. Your next plan works around it.", "accent");
+  }, [bLabel, bStart, bEnd, bDays, supabase, userId, toast]);
+
+  const removeBlocked = useCallback(
+    async (w: BlockedWindow) => {
+      setBlocked((prev) => prev.filter((x) => x.id !== w.id));
+      const { error } = await supabase.from("blocked_windows").delete().eq("id", w.id);
+      if (error) {
+        setBlocked((prev) => [...prev, w]);
+        toast("Couldn't remove that — try again.");
+      }
+    },
+    [supabase, toast],
+  );
 
   // The energy grid spans the working window; changing hours re-scopes it.
   const startHour = clockToHour(workStart);
@@ -147,12 +215,31 @@ export function SettingsClient({
       working_hours_end: workEnd,
       default_buffer_minutes: buffer,
       energy_profile: hoursToProfile(hours),
+      // Blank = no cap. Clamp so a stray keystroke can't store nonsense.
+      max_deep_minutes: maxDeep.trim()
+        ? Math.max(0, Math.min(1440, Math.round(Number(maxDeep))))
+        : null,
+      max_scheduled_minutes: maxScheduled.trim()
+        ? Math.max(0, Math.min(1440, Math.round(Number(maxScheduled))))
+        : null,
     };
     const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
     setSaving(false);
     if (error) toast("Couldn't save — nothing lost, try again.");
     else toast("Saved. Your next plan uses these.", "accent");
-  }, [supabase, userId, displayName, timezone, workStart, workEnd, buffer, hours, toast]);
+  }, [
+    supabase,
+    userId,
+    displayName,
+    timezone,
+    workStart,
+    workEnd,
+    buffer,
+    hours,
+    maxDeep,
+    maxScheduled,
+    toast,
+  ]);
 
   const useDeviceTz = () => {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -242,6 +329,147 @@ export function SettingsClient({
               <span className="text-sm text-faint">min</span>
             </div>
           </label>
+        </div>
+      </section>
+
+      {/* Daily caps — ceilings so a day can't be stuffed */}
+      <section className="space-y-4">
+        <SectionHeader aside="leave blank for no limit">Daily limits</SectionHeader>
+        <div className="flex flex-wrap items-end gap-4">
+          <label className="space-y-1.5">
+            <span className="block text-sm text-muted">Max deep work</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                max={1440}
+                step={15}
+                value={maxDeep}
+                onChange={(e) => setMaxDeep(e.target.value)}
+                placeholder="—"
+                className="tabular w-24 rounded-sm border border-line-strong bg-transparent px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+              />
+              <span className="text-sm text-faint">min / day</span>
+            </div>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-sm text-muted">Max scheduled</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                max={1440}
+                step={15}
+                value={maxScheduled}
+                onChange={(e) => setMaxScheduled(e.target.value)}
+                placeholder="—"
+                className="tabular w-24 rounded-sm border border-line-strong bg-transparent px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+              />
+              <span className="text-sm text-faint">min / day</span>
+            </div>
+          </label>
+        </div>
+        <p className="text-xs text-faint">
+          Once a limit is reached the rest waits for tomorrow — it isn&apos;t
+          dropped, and nothing is marked overdue. Your Big 3 are always placed,
+          limit or not.
+        </p>
+      </section>
+
+      {/* Protected time — recurring windows the scheduler must never touch */}
+      <section className="space-y-4">
+        <SectionHeader aside="the scheduler never plans over these">
+          Protected time
+        </SectionHeader>
+
+        {blocked.length > 0 && (
+          <ul className="flex flex-col gap-2">
+            {blocked.map((w) => (
+              <li
+                key={w.id}
+                className="flex items-center gap-3 rounded-lg border border-line px-3 py-2.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-ink">{w.label}</span>
+                  <span className="tabular block text-[11px] text-faint">
+                    {hhmm(w.start_time)}–{hhmm(w.end_time)} ·{" "}
+                    {w.days_of_week.length === 7
+                      ? "every day"
+                      : w.days_of_week
+                          .map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d])
+                          .join(" ")}
+                  </span>
+                </div>
+                <button
+                  onClick={() => void removeBlocked(w)}
+                  aria-label={`Remove ${w.label}`}
+                  className="shrink-0 rounded-sm px-2 py-1 text-faint hover:text-ink"
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="space-y-3 rounded-lg border border-line px-4 py-4">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              value={bLabel}
+              onChange={(e) => setBLabel(e.target.value)}
+              placeholder="Lunch, school run, gym…"
+              aria-label="What is this time for?"
+              className="min-w-0 flex-1 rounded-sm border border-line-strong bg-transparent px-3 py-2.5 text-sm text-ink outline-none placeholder:text-faint focus:border-accent"
+            />
+            <div className="flex items-center gap-2">
+              <input
+                type="time"
+                value={bStart}
+                onChange={(e) => setBStart(e.target.value)}
+                aria-label="Starts"
+                className="tabular rounded-sm border border-line-strong bg-transparent px-2 py-2 text-sm text-ink outline-none focus:border-accent"
+              />
+              <span className="text-sm text-faint">to</span>
+              <input
+                type="time"
+                value={bEnd}
+                onChange={(e) => setBEnd(e.target.value)}
+                aria-label="Ends"
+                className="tabular rounded-sm border border-line-strong bg-transparent px-2 py-2 text-sm text-ink outline-none focus:border-accent"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex gap-1" role="group" aria-label="Days">
+              {DAY_LABELS.map((d, i) => (
+                <button
+                  key={i}
+                  onClick={() => toggleDay(i)}
+                  aria-pressed={bDays.includes(i)}
+                  aria-label={
+                    ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][i]
+                  }
+                  className={cn(
+                    "h-9 w-9 rounded-full border text-xs transition-colors",
+                    bDays.includes(i)
+                      ? "border-accent bg-accent-tint text-accent-text"
+                      : "border-line text-faint hover:border-accent",
+                  )}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+            <Button
+              size="sm"
+              className="ml-auto"
+              disabled={!bLabel.trim() || bDays.length === 0 || bEnd <= bStart}
+              onClick={() => void addBlocked()}
+            >
+              Protect it
+            </Button>
+          </div>
         </div>
       </section>
 
