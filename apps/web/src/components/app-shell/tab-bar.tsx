@@ -44,10 +44,15 @@ export function TabBar() {
     (r) => pathname === r || pathname.startsWith(`${r}/`),
   );
 
+  // A short accent rule marks the active tab (mockup 3). It sits above the
+  // icon so the label never shifts, and fades rather than sliding — the bar is
+  // reached by thumb, and travelling indicators read as lag at that size.
   const itemClass = (active: boolean) =>
     cn(
-      "flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] transition-colors",
-      active ? "text-accent-text" : "text-faint hover:text-muted",
+      "relative flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] transition-colors",
+      "before:absolute before:top-0 before:h-0.5 before:rounded-pill before:bg-accent",
+      "before:transition-all before:duration-200 before:ease-[var(--ease-out)]",
+      active ? "text-accent-text before:w-6 before:opacity-100" : "text-faint hover:text-muted before:w-0 before:opacity-0",
     );
 
   return (
