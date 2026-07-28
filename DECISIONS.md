@@ -2,6 +2,17 @@
 
 Running log of implementation decisions that deviate from or refine CLAUDE.md. Newest first.
 
+## 2026-07-28 — Fresh start: a way back in after a stretch of not logging
+
+Founder asked for a reset after a gap. This collides head-on with CLAUDE.md §7 ("momentum dims, never resets"), so the scope was chosen deliberately: **reset what is in your way, never your record.**
+
+- **The real problem, confirmed in code**: the roll-forward at `today/page.tsx` is unbounded — `.lt("planned_date", today)` moves *every* unfinished task from *any* past day onto today. Come back after three weeks and your whole history lands on one screen. That pile is what a reset should clear.
+- **Nothing is deleted.** Backlog tasks move to **Later** (`planned_date = null`) — still in the inbox, still searchable — and the ids are held so the whole thing is undoable. Habits get a **line drawn under their history** rather than losing it: migration `0009` adds `habits.fresh_start_on`, and grids/consistency count only from that date. Every past check-in stays in the database; clearing the date makes them count again. An E2E asserts the old log row survives.
+- **Momentum is untouched, on purpose.** It is the one thing that must stay true for the comeback framing ("you've shown up 8 of the last 20 days") to mean anything. Settings says so out loud, and a test asserts that sentence is present rather than quietly dropped.
+- **Two entry points, one implementation** (`lib/fresh-start.ts`, shared so Today and Settings can't drift): the existing "welcome back" card gains a *"N things followed you here — set them down"* offer (only after a real gap, only when the pile is ≥5, never automatic), and Settings gets an always-available **Fresh start** section.
+- Grid copy now reads honestly as "3 of 5 days" after a reset instead of a fictional "3 of 14"; days before the line render faintly rather than vanishing. `/progress` consistency bars and the pattern payload use the same counted window.
+- Verified: tsc + lint + build green, **42/42 Playwright** (3 new).
+
 ## 2026-07-28 — Test-user feedback, round 3: capture types and the capture sheet
 
 Mockups were used as a source of *concepts*, not a skin — layout and structure were adapted onto the locked "Warm Paper, One Flow" tokens so light/dark and the calm identity survive intact.

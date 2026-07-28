@@ -22,7 +22,7 @@ export default async function HabitsPage() {
     await Promise.all([
       supabase
         .from("habits")
-        .select("id, title, icon, color, kind, cadence, target_per_week, position, goal_id")
+        .select("id, title, icon, color, kind, cadence, target_per_week, position, goal_id, fresh_start_on")
         .eq("archived", false)
         .order("position", { ascending: true })
         .order("created_at", { ascending: true }),

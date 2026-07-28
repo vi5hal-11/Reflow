@@ -94,6 +94,18 @@ Open http://localhost:3000 and sign in (magic link to your email).
 - [ ] Leave one undone overnight → tomorrow it's simply gone. No roll-forward,
       no badge, no guilt.
 
+## Fresh start (coming back after a gap)
+- [ ] Settings → **Fresh start** → "Clear the backlog" shows how many things are
+      waiting → **Set them down** → they leave today and appear under Later in
+      the inbox. **Undo** puts them straight back.
+- [ ] **Start habit grids from today** → grids read "0 of 1 days" instead of
+      "N of 14"; older squares dim rather than disappear. Undo restores the
+      full count. Nothing is ever deleted.
+- [ ] Confirm the **momentum strip is unchanged** by both — it dims and recovers
+      on its own, and Settings says so.
+- [ ] After a real gap of a few days with 5+ things waiting, /today's "welcome
+      back" card offers the same set-down in place.
+
 ## Habits — editing
 - [ ] On /habits, tap the ✏️ on a habit → rename it, change its icon, colour or
       type → Save.

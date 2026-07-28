@@ -122,7 +122,7 @@ export function GoalOnboard({
             cadence: h.cadence,
             position: pos++,
           })
-          .select("id, title, icon, color, kind, cadence, target_per_week, position, goal_id")
+          .select("id, title, icon, color, kind, cadence, target_per_week, position, goal_id, fresh_start_on")
           .single();
         if (habit) createdHabits.push(habit as Habit);
       }

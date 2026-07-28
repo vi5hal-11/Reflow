@@ -40,6 +40,8 @@ export type Habit = {
   target_per_week: number | null;
   position: number;
   goal_id: string | null;
+  /** Grid and consistency count only from this date. Earlier logs are kept. */
+  fresh_start_on: string | null;
 };
 export type HabitLog = { habit_id: string; log_date: string; minutes: number | null };
 export type Goal = { id: string; title: string; color: string };
@@ -153,7 +155,7 @@ export function HabitsClient({
           kind: draft.kind,
           position: habits.length,
         })
-        .select("id, title, icon, color, kind, cadence, target_per_week, position, goal_id")
+        .select("id, title, icon, color, kind, cadence, target_per_week, position, goal_id, fresh_start_on")
         .single();
       if (data) {
         setHabits((prev) => [...prev, data as Habit]);
@@ -400,7 +402,12 @@ function HabitTile({
   const key = `${habit.id}|${today}`;
   const doneToday = logged.has(key);
   const todayMin = minutes[key] ?? 0;
-  const shownUp = days.filter((d) => logged.has(`${habit.id}|${d}`)).length;
+  // A fresh start draws a line: days before it are shown faintly but no longer
+  // counted, so the grid reads "3 of 5 days" rather than "3 of 14".
+  const counted = habit.fresh_start_on
+    ? days.filter((d) => d >= habit.fresh_start_on!)
+    : days;
+  const shownUp = counted.filter((d) => logged.has(`${habit.id}|${d}`)).length;
   const timed = habit.kind !== "habit";
   const label = doneToday ? (timed ? `✓ ${todayMin}m` : "✓ Today") : KIND_META[habit.kind].verb;
 
@@ -451,13 +458,15 @@ function HabitTile({
         <div className="flex gap-1">
           {days.map((d) => {
             const on = logged.has(`${habit.id}|${d}`);
+            const before = Boolean(habit.fresh_start_on && d < habit.fresh_start_on);
             return (
               <span
                 key={d}
-                title={d}
+                title={before ? `${d} — before your fresh start` : d}
                 className={cn(
                   "h-3.5 w-3.5 rounded-[3px]",
                   on ? COLOR[color].bg : "bg-line",
+                  before && "opacity-25",
                   d === today && "ring-1 ring-accent ring-offset-1",
                 )}
               />
@@ -465,7 +474,7 @@ function HabitTile({
           })}
         </div>
         <span className="ml-auto text-[11px] text-faint">
-          {shownUp} of {GRID_DAYS} days
+          {shownUp} of {counted.length} days
         </span>
       </div>
     </li>

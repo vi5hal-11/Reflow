@@ -79,6 +79,8 @@ For production, add your deployed origin to Supabase → Authentication → **UR
 
 **No guilt, by construction** — soft roll-forward with a "no baggage" note and never an overdue badge; a 28-day momentum strip that dims but never resets; explicit rest days; comeback framing after a gap; estimate-vs-actual learning that transparently pads future plans; morning and evening rituals, and a reflection you can reach at any hour.
 
+**Fresh start** — coming back after a stretch away, the backlog that followed you can be set down in one action (it moves to Later, never deleted, and it's undoable), and habit grids can start counting from today while keeping every past check-in. Your momentum strip is deliberately never reset — it dims and recovers on its own, so "you've shown up 8 of the last 20 days" stays true.
+
 **Projects** — create, rename, archive, restore, delete and colour; assign from a task's edit sheet; filter the inbox by project; one-tap "create + assign" from the AI's suggestion. Deleting a project never deletes its tasks.
 
 **Habits & wellness** — habits with a no-guilt 14-day grid (it dims, it never resets), full editing and deletion, a weather-metaphor mood check-in, daily journaling, a meditation timer, workout minute logging, a deterministic `/progress` page, AI-assisted goal onboarding, and gentle pattern insights. Deliberately single-player: no social, competition, XP or leaderboards.

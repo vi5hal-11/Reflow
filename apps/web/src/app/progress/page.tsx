@@ -41,7 +41,7 @@ export default async function ProgressPage() {
     await Promise.all([
       supabase
         .from("habits")
-        .select("id, title, icon, color, kind")
+        .select("id, title, icon, color, kind, fresh_start_on")
         .eq("archived", false)
         .order("position", { ascending: true }),
       supabase
@@ -115,8 +115,14 @@ export default async function ProgressPage() {
     habits: habitList.map((h) => ({
       title: h.title,
       kind: h.kind as string,
-      days_active: days14.filter((d) => (logsByHabit.get(h.id) ?? new Set()).has(d)).length,
-      window_days: 14,
+      days_active: (h.fresh_start_on
+        ? days14.filter((d) => d >= h.fresh_start_on!)
+        : days14
+      ).filter((d) => (logsByHabit.get(h.id) ?? new Set()).has(d)).length,
+      window_days: (h.fresh_start_on
+        ? days14.filter((d) => d >= h.fresh_start_on!)
+        : days14
+      ).length,
     })),
     journal_days: journalDays14,
     meditation_minutes: meditMin14,
@@ -209,8 +215,12 @@ export default async function ProgressPage() {
               const color = colorOf(h.color);
               const Icon = habitIcon(h.icon);
               const set = logsByHabit.get(h.id) ?? new Set();
-              const count = days14.filter((d) => set.has(d)).length;
-              const pct = count / 14;
+              // A fresh start draws a line: only days from it forward count.
+              const counted = h.fresh_start_on
+                ? days14.filter((d) => d >= h.fresh_start_on!)
+                : days14;
+              const count = counted.filter((d) => set.has(d)).length;
+              const pct = counted.length ? count / counted.length : 0;
               return (
                 <li key={h.id} className="flex items-center gap-3">
                   <span
@@ -224,7 +234,9 @@ export default async function ProgressPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="truncate text-sm text-ink">{h.title}</span>
-                      <span className="shrink-0 text-[11px] text-faint">{count} of 14</span>
+                      <span className="shrink-0 text-[11px] text-faint">
+                        {count} of {counted.length}
+                      </span>
                     </div>
                     <div className="mt-1 h-1.5 overflow-hidden rounded-pill bg-line">
                       <div

@@ -14,6 +14,7 @@ import { Meter, Ring } from "@/components/ui/ring";
 import { SunHorizon } from "@/components/ui/sun-horizon";
 import { EnergyArc } from "@/components/ui/energy-arc";
 import { CaptureSheet } from "@/components/capture/capture-sheet";
+import { clearBacklog, restoreBacklog } from "@/lib/fresh-start";
 import { Welcome } from "@/components/onboarding/welcome";
 import { Button } from "@/components/ui/button";
 import {
@@ -139,6 +140,9 @@ export function TodayClient({
   const [ritualDismissed, setRitualDismissed] = useState(false);
   const [optionalText, setOptionalText] = useState("");
   const [capturing, setCapturing] = useState(false);
+  // Ids set down by a fresh start, held so the whole thing stays undoable.
+  const [setAside, setSetAside] = useState<string[] | null>(null);
+  const [clearing, setClearing] = useState(false);
   // A tap on a just-added optional task can land before its insert returns.
   // These replay that intent once the real row arrives, so a fast tap on a
   // slow connection is never silently lost.
@@ -634,6 +638,35 @@ export function TodayClient({
     [supabase, patchTask, big3Ids, userId, today],
   );
 
+  // A stretch away means everything unfinished followed you here. Setting it
+  // down clears the day without losing anything — the tasks go to Later.
+  const toastLikeNotice = (msg: string) => setPlanNotice(msg);
+
+  const setDownBacklog = useCallback(async () => {
+    setClearing(true);
+    const { ids, error } = await clearBacklog(supabase, today);
+    setClearing(false);
+    if (error) {
+      toastLikeNotice("Couldn't clear that just now — try again.");
+      return;
+    }
+    setTasks((prev) =>
+      prev.map((t) =>
+        ids.includes(t.id) ? { ...t, planned_date: null, status: "todo", is_big3: false } : t,
+      ),
+    );
+    setBig3Ids((prev) => prev.filter((id) => !ids.includes(id)));
+    setSetAside(ids);
+  }, [supabase, today]);
+
+  const undoSetDown = useCallback(async () => {
+    const ids = setAside;
+    if (!ids) return;
+    setSetAside(null);
+    const ok = await restoreBacklog(supabase, ids, today);
+    if (ok) router.refresh();
+  }, [setAside, supabase, today, router]);
+
   const toggleBig3 = useCallback(
     async (task: DayTask) => {
       const isIn = big3Ids.includes(task.id);
@@ -1038,11 +1071,44 @@ export function TodayClient({
 
       {/* Momentum — dims, never resets (§7) */}
       <section aria-label="Momentum" className="space-y-2">
-        {comebackGap !== null && (
-          <p className="rounded-lg border border-line px-4 py-2 text-sm text-muted dark:border-line dark:text-muted">
-            welcome back — you&apos;ve shown up {active20} of the last {denom20}{" "}
-            days. that counts.
-          </p>
+        {setAside ? (
+          <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5 text-sm">
+            <span className="min-w-0 flex-1 text-muted">
+              {setAside.length} set down — they&apos;re in Later, not gone.
+            </span>
+            <button
+              onClick={() => void undoSetDown()}
+              className="shrink-0 font-medium text-accent-text underline underline-offset-4"
+            >
+              Undo
+            </button>
+          </div>
+        ) : (
+          comebackGap !== null && (
+            <div className="rounded-lg border border-line px-4 py-3">
+              <p className="text-sm text-muted">
+                welcome back — you&apos;ve shown up {active20} of the last {denom20}{" "}
+                days. that counts.
+              </p>
+              {/* Everything unfinished followed you here. Offer to set it down —
+                  never automatically, and never as a reprimand. */}
+              {tray.length >= 5 && (
+                <div className="mt-2.5 flex flex-wrap items-center gap-3">
+                  <span className="text-[13px] text-faint">
+                    {tray.length} things followed you here from before.
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="quiet"
+                    disabled={clearing}
+                    onClick={() => void setDownBacklog()}
+                  >
+                    {clearing ? "setting down…" : "Set them down"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )
         )}
         <div className="flex items-center gap-3">
           <div className="flex gap-0.75" aria-hidden>

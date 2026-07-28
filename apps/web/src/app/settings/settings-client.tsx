@@ -8,6 +8,13 @@ import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/ui/section-header";
 import { useToast } from "@/components/ui/toast";
 import {
+  clearBacklog,
+  countBacklog,
+  freshStartHabits,
+  restoreBacklog,
+  undoFreshStartHabits,
+} from "@/lib/fresh-start";
+import {
   blockedWindowColumns,
   energyTags,
   type BlockedWindow,
@@ -144,6 +151,69 @@ export function SettingsClient({
       prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort(),
     );
   }, []);
+
+  // --- fresh start ---------------------------------------------------------
+  // Coming back after a stretch away. Nothing is deleted: the backlog moves to
+  // Later, and habits get a line drawn under their history rather than losing
+  // it. Momentum is deliberately untouched (CLAUDE.md §7).
+  const [backlog, setBacklog] = useState<number | null>(null);
+  const [setAside, setSetAside] = useState<string[] | null>(null);
+  const [habitsReset, setHabitsReset] = useState(false);
+  const [working, setWorking] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    const t = setTimeout(async () => {
+      const n = await countBacklog(supabase);
+      if (alive) setBacklog(n);
+    }, 0);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [supabase]);
+
+  const doClearBacklog = useCallback(async () => {
+    setWorking(true);
+    const { ids, error } = await clearBacklog(supabase);
+    setWorking(false);
+    if (error) {
+      toast("Couldn't clear that — try again.");
+      return;
+    }
+    setSetAside(ids);
+    setBacklog(0);
+    toast(`${ids.length} set down — they're in Later.`, "accent");
+  }, [supabase, toast]);
+
+  const doUndoBacklog = useCallback(async () => {
+    const ids = setAside;
+    if (!ids) return;
+    setSetAside(null);
+    if (await restoreBacklog(supabase, ids)) {
+      setBacklog(ids.length);
+      toast("Put back on today.");
+    }
+  }, [setAside, supabase, toast]);
+
+  const doFreshHabits = useCallback(async () => {
+    setWorking(true);
+    const ok = await freshStartHabits(supabase, userId);
+    setWorking(false);
+    if (!ok) {
+      toast("Couldn't do that — try again.");
+      return;
+    }
+    setHabitsReset(true);
+    toast("Habit grids count from today.", "accent");
+  }, [supabase, userId, toast]);
+
+  const doUndoFreshHabits = useCallback(async () => {
+    if (await undoFreshStartHabits(supabase, userId)) {
+      setHabitsReset(false);
+      toast("Your full history counts again.");
+    }
+  }, [supabase, userId, toast]);
 
   const addBlocked = useCallback(async () => {
     const label = bLabel.trim();
@@ -548,6 +618,68 @@ export function SettingsClient({
         <p className="text-xs text-faint">
           Tap or drag across the hours. Leave the rest blank — the scheduler still
           fills them, it just won&apos;t prefer them for that kind of work.
+        </p>
+      </section>
+
+      {/* Fresh start — the way back in after a stretch away */}
+      <section className="space-y-4">
+        <SectionHeader aside="nothing is deleted">Fresh start</SectionHeader>
+
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-ink">Clear the backlog</p>
+            <p className="text-[11px] text-faint">
+              {backlog === null
+                ? "counting…"
+                : backlog === 0
+                  ? "Nothing waiting — your day is already clear."
+                  : `${backlog} thing${backlog === 1 ? "" : "s"} waiting on today. Moving them to Later takes them off your day without losing them.`}
+            </p>
+          </div>
+          {setAside ? (
+            <Button variant="ghost" size="sm" onClick={() => void doUndoBacklog()}>
+              Undo
+            </Button>
+          ) : (
+            <Button
+              variant="quiet"
+              size="sm"
+              disabled={working || !backlog}
+              onClick={() => void doClearBacklog()}
+            >
+              Set them down
+            </Button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-ink">Start habit grids from today</p>
+            <p className="text-[11px] text-faint">
+              Draws a line under past check-ins. They&apos;re kept, just no longer
+              counted — so a long gap stops shaping the grid.
+            </p>
+          </div>
+          {habitsReset ? (
+            <Button variant="ghost" size="sm" onClick={() => void doUndoFreshHabits()}>
+              Undo
+            </Button>
+          ) : (
+            <Button
+              variant="quiet"
+              size="sm"
+              disabled={working}
+              onClick={() => void doFreshHabits()}
+            >
+              Start fresh
+            </Button>
+          )}
+        </div>
+
+        <p className="text-xs text-faint">
+          Your momentum strip is never reset — it dims and recovers on its own.
+          &ldquo;You&apos;ve shown up 8 of the last 20 days&rdquo; is only worth
+          saying while it&apos;s true.
         </p>
       </section>
 
