@@ -19,7 +19,15 @@ const TABS = [
 
 // Routes reachable from the More sheet — the tab bar stays visible on them, and
 // the More tab reads as active while you're in one.
-const MORE_ROUTES = ["/projects", "/week", "/focus", "/journal", "/progress"];
+const MORE_ROUTES = [
+  "/agenda",
+  "/review",
+  "/projects",
+  "/week",
+  "/focus",
+  "/journal",
+  "/progress",
+];
 
 const APP_ROUTES = [...TABS.map((t) => t.href), ...MORE_ROUTES];
 

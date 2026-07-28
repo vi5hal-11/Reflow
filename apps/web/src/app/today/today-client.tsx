@@ -11,6 +11,7 @@ import { Check } from "lucide-react";
 import { ENERGY, EnergyDot } from "@/components/ui/energy";
 import { Meter, Ring } from "@/components/ui/ring";
 import { SunHorizon } from "@/components/ui/sun-horizon";
+import { EnergyArc } from "@/components/ui/energy-arc";
 import { Welcome } from "@/components/onboarding/welcome";
 import { Button } from "@/components/ui/button";
 import {
@@ -989,15 +990,23 @@ export function TodayClient({
             .
           </p>
           <div className="mt-3 flex gap-2">
-            <Button onClick={() => void reflect()} disabled={reflecting}>
-              {reflecting ? "looking back…" : "Reflect on today"}
-            </Button>
+            <Link href="/review">
+              <Button>Close the day</Button>
+            </Link>
             <Button variant="ghost" onClick={() => setRitualDismissed(true)}>
               dismiss
             </Button>
           </div>
         </section>
       ) : null}
+
+      {/* The daily arc — how today is shaped, and where in it you are. */}
+      <EnergyArc
+        energyProfile={profile.energy_profile}
+        dayStart={dayStart}
+        dayEnd={dayEnd}
+        now={now}
+      />
 
       {dayTotal > 0 && (
         <section

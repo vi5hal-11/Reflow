@@ -5,7 +5,9 @@ import {
   CalendarRange,
   FolderKanban,
   LineChart,
+  ListChecks,
   NotebookPen,
+  Sunset,
   Timer,
 } from "lucide-react";
 import { Sheet } from "@/components/ui/sheet";
@@ -14,6 +16,18 @@ import { Sheet } from "@/components/ui/sheet";
 // only through a header link or the view-switcher — one calm list makes them
 // discoverable without crowding the tab bar.
 const LINKS = [
+  {
+    href: "/agenda",
+    label: "Agenda",
+    hint: "the day by the clock",
+    Icon: ListChecks,
+  },
+  {
+    href: "/review",
+    label: "Review",
+    hint: "close today, set up tomorrow",
+    Icon: Sunset,
+  },
   {
     href: "/projects",
     label: "Projects",

@@ -108,6 +108,8 @@ export function CommandPalette() {
       { id: "week", label: "Go to Week", keywords: "upcoming ahead days", run: () => { close(); router.push("/week"); } },
       { id: "focus", label: "Enter Focus", keywords: "execute now one thing timer", run: () => { close(); router.push("/focus"); } },
       { id: "inbox", label: "Go to Inbox", keywords: "capture triage", run: () => { close(); router.push("/inbox"); } },
+      { id: "agenda", label: "Go to Agenda", keywords: "timed schedule done pending clock", run: () => { close(); router.push("/agenda"); } },
+      { id: "review", label: "Close the day", keywords: "review reflect tomorrow evening shutdown weekly", run: () => { close(); router.push("/review"); } },
       { id: "habits", label: "Go to Habits", keywords: "streak routine wellness", run: () => { close(); router.push("/habits"); } },
       { id: "journal", label: "Go to Journal", keywords: "write diary reflect note", run: () => { close(); router.push("/journal"); } },
       { id: "progress", label: "Go to Progress", keywords: "stats insights mood trends consistency", run: () => { close(); router.push("/progress"); } },
